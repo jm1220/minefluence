@@ -1,0 +1,65 @@
+# MineFluence Tutorial Screen
+
+## Assets
+
+The tutorial uses five full-screen image pages:
+
+- `src/main/resources/assets/minefluence/textures/gui/tutorial/tutorial_1.png`
+- `src/main/resources/assets/minefluence/textures/gui/tutorial/tutorial_2.png`
+- `src/main/resources/assets/minefluence/textures/gui/tutorial/tutorial_3.png`
+- `src/main/resources/assets/minefluence/textures/gui/tutorial/tutorial_4.png`
+- `src/main/resources/assets/minefluence/textures/gui/tutorial/tutorial_5.png`
+
+Texture identifiers:
+
+- `minefluence:textures/gui/tutorial/tutorial_1.png`
+- `minefluence:textures/gui/tutorial/tutorial_2.png`
+- `minefluence:textures/gui/tutorial/tutorial_3.png`
+- `minefluence:textures/gui/tutorial/tutorial_4.png`
+- `minefluence:textures/gui/tutorial/tutorial_5.png`
+
+Replace the images later by overwriting those PNG files with the final tutorial artwork.
+
+## Page Order
+
+`MineFluenceTutorialScreen` starts on `tutorial_1.png` and advances through `tutorial_5.png`.
+
+## Rendering
+
+The screen draws a black fallback background first, then draws the current tutorial image over it. The image is scaled with a 16:9 cover fit, centered on the screen. This fills the viewport while preserving the tutorial art aspect ratio; very wide or very tall screens may crop the edges.
+
+No vanilla button graphics or extra text are drawn on top of the tutorial art.
+
+## Click Area
+
+The tutorial art already contains the visible Next/Play button. The implementation uses an invisible click target:
+
+- X: 62% to 85% of screen width
+- Y: 82% to 92% of screen height
+
+Clicking this area advances pages 1 through 4. On page 5, it closes the tutorial and sends a server packet to continue the demo.
+
+Keyboard support:
+
+- Enter: next/play
+- Space: next/play
+- Escape: close screen without sending Play
+
+## Opening
+
+Player commands:
+
+- `/minefluence tutorial`
+- `/minefluence tutorial open`
+
+`/minefluence start` still performs the existing demo reset/start behavior, then opens the tutorial screen if the client supports the MineFluence tutorial packet.
+
+## Play Behavior
+
+On the final page, Play sends `MineFluenceTutorialPlayPayload` to the server. The server calls the same shared Farmer selection flow used by `/minefluence choose farmer`, so the server remains authoritative and the client does not mutate game state directly.
+
+## Limitations
+
+- The button hitbox is based on relative screen coordinates. If future art moves the button, update the ratios in `MineFluenceTutorialScreen`.
+- The image scaling assumes 16:9 tutorial art.
+- Closing with Escape skips the Play packet and does not auto-select Farmer.
