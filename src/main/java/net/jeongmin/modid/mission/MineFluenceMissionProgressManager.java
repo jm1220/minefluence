@@ -1,20 +1,42 @@
 package net.jeongmin.modid.mission;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Predicate;
 
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
+import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.jeongmin.modid.area.MineFluenceArea;
 import net.jeongmin.modid.area.MineFluenceAreaType;
+import net.jeongmin.modid.area.MineFluenceDemoMapPreset;
+import net.jeongmin.modid.area.MineFluenceMissionAreas;
 import net.jeongmin.modid.config.MineFluenceBalance;
+import net.jeongmin.modid.core.MineFluenceJob;
 import net.jeongmin.modid.data.MineFluencePlayerData;
 import net.jeongmin.modid.data.MineFluenceWorldState;
+import net.jeongmin.modid.fan.MineFluenceFanVillagers;
+import net.jeongmin.modid.mixin.DoubleInventoryAccessor;
 import net.jeongmin.modid.ui.MineFluenceDisplay;
 import net.jeongmin.modid.ui.MineFluenceHud;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.BarrelBlockEntity;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.ChestBlockEntity;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.inventory.DoubleInventory;
+import net.minecraft.inventory.Inventory;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -30,25 +52,83 @@ import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.World;
 
 public final class MineFluenceMissionProgressManager {
+	private static final Map<UUID, ContainerSnapshot> OPEN_CONTAINER_SNAPSHOTS = new HashMap<>();
+
 	private MineFluenceMissionProgressManager() {
 	}
 
 	public static void register() {
 		ServerTickEvents.END_SERVER_TICK.register(MineFluenceMissionProgressManager::tick);
 		UseEntityCallback.EVENT.register(MineFluenceMissionProgressManager::onUseEntity);
+		UseBlockCallback.EVENT.register(MineFluenceMissionProgressManager::onUseBlock);
+		AttackEntityCallback.EVENT.register(MineFluenceMissionProgressManager::onAttackEntity);
+		PlayerBlockBreakEvents.AFTER.register(MineFluenceMissionProgressManager::onBlockBreak);
+		ServerLivingEntityEvents.AFTER_DEATH.register(MineFluenceMissionProgressManager::onLivingDeath);
+	}
+
+	public static boolean hasBadGameplayDetection(int missionIndex) {
+		return switch (missionIndex) {
+			case 1, 2, 3, 4, 5, 6, 7 -> true;
+			default -> false;
+		};
+	}
+
+	public static void onFarmlandTrampled(Entity entity, BlockState originalState, World world, BlockPos pos) {
+		if (world == null
+				|| world.isClient()
+				|| !(world instanceof ServerWorld serverWorld)
+				|| !(entity instanceof ServerPlayerEntity serverPlayer)
+				|| serverPlayer.isSpectator()) {
+			return;
+		}
+		if (originalState == null || !originalState.isOf(Blocks.FARMLAND) || !world.getBlockState(pos).isOf(Blocks.FARMLAND)) {
+			return;
+		}
+		if (!isInsideMissionArea(serverPlayer, serverWorld, pos, MineFluenceMissionRoute.BAD, 2)) {
+			return;
+		}
+
+		incrementBadMissionProgress(serverPlayer, 2, 1);
+	}
+
+	public static void onGenericContainerOpened(ServerPlayerEntity player, Inventory inventory) {
+		if (player == null || player.getServer() == null || player.isSpectator() || inventory == null) {
+			return;
+		}
+		if (!canProgressActiveBadMission(player, 4) || !isVillagerContainer(player, inventory)) {
+			OPEN_CONTAINER_SNAPSHOTS.remove(player.getUuid());
+			return;
+		}
+
+		OPEN_CONTAINER_SNAPSHOTS.put(player.getUuid(), new ContainerSnapshot(inventory, countItems(inventory)));
+	}
+
+	public static void onGenericContainerClosed(PlayerEntity player, Inventory inventory) {
+		if (!(player instanceof ServerPlayerEntity serverPlayer) || inventory == null) {
+			return;
+		}
+
+		ContainerSnapshot snapshot = OPEN_CONTAINER_SNAPSHOTS.remove(serverPlayer.getUuid());
+		if (snapshot == null || snapshot.inventory() != inventory || !canProgressActiveBadMission(serverPlayer, 4)) {
+			return;
+		}
+
+		int removedItems = snapshot.itemCount() - countItems(inventory);
+		if (removedItems > 0) {
+			incrementBadMissionProgress(serverPlayer, 4, removedItems);
+		}
 	}
 
 	public static boolean canStartMission(ServerPlayerEntity player, MineFluenceMission mission) {
-		if (mission.route() == MineFluenceMissionRoute.BAD) {
-			return true;
-		}
-
-		MineFluenceAreaType requiredAreaType = requiredAreaType(mission.index());
+		MineFluenceAreaType requiredAreaType = MineFluenceMissionAreas.getAreaForMission(mission.route(), mission.index());
 		if (requiredAreaType == null) {
 			return true;
 		}
 
 		MineFluenceWorldState state = MineFluenceWorldState.get(player.getServer());
+		if (state.getArea(requiredAreaType) == null && MineFluenceDemoMapPreset.loadInto(state, false) > 0) {
+			MineFluenceDisplay.sendChat(player, "Area preset was missing and has been restored.");
+		}
 		MineFluenceArea area = state.getArea(requiredAreaType);
 		if (area == null) {
 			MineFluenceDisplay.sendChat(player, requiredAreaType.displayName() + " area is not configured. Use /minefluence area load_preset, /minefluence area set " + requiredAreaType.commandName() + " <radius>, or /minefluence area set_box.");
@@ -89,7 +169,10 @@ public final class MineFluenceMissionProgressManager {
 
 		MineFluenceMission mission = missionFor(data.getActiveMissionIndex(), data.getActiveMissionRoute());
 		if (mission.route() == MineFluenceMissionRoute.BAD) {
-			return "Bad mission detection is not implemented yet. Use /minefluence mission complete_debug for now.";
+			if (hasBadGameplayDetection(mission.index())) {
+				return mission.title() + ": " + data.getActiveMissionProgress() + "/" + mission.targetProgress();
+			}
+			return mission.title() + ": gameplay detection is planned for Stage 4B. Use /minefluence mission complete_debug for now.";
 		}
 		if (mission.index() == 7) {
 			FarmPlotCounts counts = countFarmPlot(player.getServer());
@@ -117,6 +200,9 @@ public final class MineFluenceMissionProgressManager {
 
 		MineFluenceMission mission = missionFor(data.getActiveMissionIndex(), data.getActiveMissionRoute());
 		if (mission.route() == MineFluenceMissionRoute.BAD) {
+			if (hasBadGameplayDetection(mission.index())) {
+				return mission.title() + " " + data.getActiveMissionProgress() + "/" + mission.targetProgress();
+			}
 			return mission.title() + " debug-only";
 		}
 		return mission.title() + " " + data.getActiveMissionProgress() + "/" + mission.targetProgress();
@@ -150,7 +236,11 @@ public final class MineFluenceMissionProgressManager {
 
 		MineFluenceWorldState state = MineFluenceWorldState.get(serverPlayer.getServer());
 		MineFluencePlayerData data = state.getPlayerData(serverPlayer);
-		if (!data.hasActiveMission() || data.isWaitingForPostingChoice() || data.getActiveMissionRoute() != MineFluenceMissionRoute.GOOD || !(entity instanceof VillagerEntity villager)) {
+		if (!data.hasActiveMission()
+				|| data.isWaitingForPostingChoice()
+				|| data.getActiveMissionRoute() != MineFluenceMissionRoute.GOOD
+				|| !(entity instanceof VillagerEntity villager)
+				|| MineFluenceFanVillagers.isFan(villager)) {
 			return ActionResult.PASS;
 		}
 
@@ -169,6 +259,80 @@ public final class MineFluenceMissionProgressManager {
 		}
 
 		return ActionResult.PASS;
+	}
+
+	private static ActionResult onUseBlock(
+			net.minecraft.entity.player.PlayerEntity player,
+			World world,
+			Hand hand,
+			net.minecraft.util.hit.BlockHitResult hitResult
+	) {
+		if (world.isClient() || hand != Hand.MAIN_HAND || !(player instanceof ServerPlayerEntity serverPlayer) || serverPlayer.isSpectator()) {
+			return ActionResult.PASS;
+		}
+
+		if (world.getBlockState(hitResult.getBlockPos()).isOf(Blocks.BELL)) {
+			incrementBadMissionProgress(serverPlayer, 1, 1);
+		}
+		return ActionResult.PASS;
+	}
+
+	private static ActionResult onAttackEntity(
+			net.minecraft.entity.player.PlayerEntity player,
+			World world,
+			Hand hand,
+			Entity entity,
+			net.minecraft.util.hit.EntityHitResult hitResult
+	) {
+		if (world.isClient() || hand != Hand.MAIN_HAND || !(player instanceof ServerPlayerEntity serverPlayer) || serverPlayer.isSpectator()) {
+			return ActionResult.PASS;
+		}
+
+		if (entity instanceof VillagerEntity && !MineFluenceFanVillagers.isFan(entity)) {
+			incrementBadMissionProgress(serverPlayer, 3, 1);
+		}
+		return ActionResult.PASS;
+	}
+
+	private static void onBlockBreak(
+			World world,
+			net.minecraft.entity.player.PlayerEntity player,
+			BlockPos pos,
+			BlockState state,
+			net.minecraft.block.entity.BlockEntity blockEntity
+	) {
+		if (world.isClient() || !(world instanceof ServerWorld serverWorld) || !(player instanceof ServerPlayerEntity serverPlayer) || serverPlayer.isSpectator()) {
+			return;
+		}
+
+		if (state == null) {
+			return;
+		}
+
+		if (state.isOf(Blocks.FARMLAND)
+				&& isInsideMissionArea(serverPlayer, serverWorld, pos, MineFluenceMissionRoute.BAD, 2)) {
+			incrementBadMissionProgress(serverPlayer, 2, 1);
+		}
+		if (state.isOf(Blocks.COMPOSTER)) {
+			incrementBadMissionProgress(serverPlayer, 5, 1);
+		}
+		if (isFarmPlotDestructionBlock(state)
+				&& isInsideMissionArea(serverPlayer, serverWorld, pos, MineFluenceMissionRoute.BAD, 6)) {
+			incrementBadMissionProgress(serverPlayer, 6, 1);
+		}
+	}
+
+	private static void onLivingDeath(LivingEntity entity, DamageSource damageSource) {
+		if (entity.getWorld().isClient()
+				|| !(entity instanceof VillagerEntity)
+				|| MineFluenceFanVillagers.isFan(entity)) {
+			return;
+		}
+
+		Entity attacker = damageSource.getAttacker();
+		if (attacker instanceof ServerPlayerEntity serverPlayer && !serverPlayer.isSpectator()) {
+			incrementBadMissionProgress(serverPlayer, 7, 1);
+		}
 	}
 
 	private static int scannedProgress(ServerPlayerEntity player, MineFluencePlayerData data) {
@@ -193,6 +357,47 @@ public final class MineFluenceMissionProgressManager {
 		updateProgress(player, state, data, data.getActiveMissionProgress() + amount);
 	}
 
+	public static boolean incrementBadMissionProgress(ServerPlayerEntity player, int missionIndex, int amount) {
+		if (amount <= 0 || player.getServer() == null) {
+			return false;
+		}
+
+		MineFluenceWorldState state = MineFluenceWorldState.get(player.getServer());
+		MineFluencePlayerData data = state.getPlayerData(player);
+		MineFluenceMission mission = missionFor(data.getActiveMissionIndex(), data.getActiveMissionRoute());
+		if (!canProgressActiveBadMission(data, mission, missionIndex)) {
+			return false;
+		}
+
+		incrementEventProgress(player, state, data, amount);
+		return true;
+	}
+
+	private static boolean canProgressActiveBadMission(ServerPlayerEntity player, int missionIndex) {
+		if (player == null || player.getServer() == null) {
+			return false;
+		}
+
+		MineFluenceWorldState state = MineFluenceWorldState.get(player.getServer());
+		MineFluencePlayerData data = state.getPlayerData(player);
+		MineFluenceMission mission = missionFor(data.getActiveMissionIndex(), data.getActiveMissionRoute());
+		return canProgressActiveBadMission(data, mission, missionIndex);
+	}
+
+	private static boolean canProgressActiveBadMission(MineFluencePlayerData data, MineFluenceMission mission, int missionIndex) {
+		return data.getSelectedJob() == MineFluenceJob.FARMER
+				&& !data.isEndingTriggered()
+				&& data.hasActiveMission()
+				&& !data.isWaitingForPostingChoice()
+				&& data.getActiveMissionRoute() == MineFluenceMissionRoute.BAD
+				&& data.getActiveMissionIndex() == missionIndex
+				&& mission.route() == MineFluenceMissionRoute.BAD
+				&& mission.index() == missionIndex
+				&& hasBadGameplayDetection(missionIndex)
+				&& mission.targetProgress() > 0
+				&& data.getActiveMissionProgress() < mission.targetProgress();
+	}
+
 	private static void updateProgress(ServerPlayerEntity player, MineFluenceWorldState state, MineFluencePlayerData data, int rawProgress) {
 		MineFluenceMission mission = missionFor(data.getActiveMissionIndex(), data.getActiveMissionRoute());
 		int progress = Math.min(Math.max(0, rawProgress), mission.targetProgress());
@@ -201,7 +406,6 @@ public final class MineFluenceMissionProgressManager {
 			state.markDirty();
 		}
 
-		MineFluenceDisplay.sendActionBar(player, "[MineFluence] " + progressText(player, data));
 		MineFluenceHud.refresh(player, data);
 		if (progress >= mission.targetProgress()) {
 			completeActiveMission(player, state, data, mission);
@@ -209,28 +413,16 @@ public final class MineFluenceMissionProgressManager {
 	}
 
 	private static void completeActiveMission(ServerPlayerEntity player, MineFluenceWorldState state, MineFluencePlayerData data, MineFluenceMission mission) {
-		if (!data.hasActiveMission() || data.isWaitingForPostingChoice()) {
+		if (!MineFluenceMissionCompletionService.complete(player, state, data, mission)) {
 			return;
 		}
 
-		data.markActiveMissionReadyToPost();
-		state.markDirty();
 		MineFluenceDisplay.sendChat(player, "Mission objective completed!");
 		MineFluenceDisplay.sendChat(player, "Choose posting style:");
 		MineFluenceDisplay.sendChat(player, "/minefluence post normal");
 		MineFluenceDisplay.sendChat(player, "/minefluence post exaggerate");
 		MineFluenceDisplay.sendActionBar(player, "[MineFluence] " + mission.title() + " complete");
 		MineFluenceHud.refresh(player, data);
-	}
-
-	private static MineFluenceAreaType requiredAreaType(int missionIndex) {
-		return switch (missionIndex) {
-			case 1 -> MineFluenceAreaType.GARDEN;
-			case 2 -> MineFluenceAreaType.FARM;
-			case 6 -> MineFluenceAreaType.SHARED_SPACE;
-			case 7 -> MineFluenceAreaType.FARM_BUILD_AREA;
-			default -> null;
-		};
 	}
 
 	private static int countBlocksInArea(MinecraftServer server, MineFluenceAreaType type, Predicate<BlockState> matcher) {
@@ -292,6 +484,80 @@ public final class MineFluenceMissionProgressManager {
 		return new FarmPlotCounts(water, farmland, composter);
 	}
 
+	private static boolean isFarmPlotDestructionBlock(BlockState state) {
+		return state.isOf(Blocks.FARMLAND)
+				|| state.isOf(Blocks.WHEAT)
+				|| state.isOf(Blocks.CARROTS)
+				|| state.isOf(Blocks.POTATOES)
+				|| state.isOf(Blocks.BEETROOTS);
+	}
+
+	private static boolean isInsideMissionArea(
+			ServerPlayerEntity player,
+			ServerWorld world,
+			BlockPos pos,
+			MineFluenceMissionRoute route,
+			int missionIndex
+	) {
+		MineFluenceAreaType type = MineFluenceMissionAreas.getAreaForMission(route, missionIndex);
+		if (type == null) {
+			return true;
+		}
+		MineFluenceArea area = MineFluenceWorldState.get(player.getServer()).getArea(type);
+		return area != null && area.contains(world, pos);
+	}
+
+	private static boolean isVillagerContainer(ServerPlayerEntity player, Inventory inventory) {
+		List<BlockEntity> containers = new ArrayList<>();
+		collectVillagerContainerBlocks(inventory, containers);
+		if (containers.isEmpty()) {
+			return false;
+		}
+
+		MineFluenceAreaType type = MineFluenceMissionAreas.getAreaForMission(MineFluenceMissionRoute.BAD, 4);
+		MineFluenceArea area = MineFluenceWorldState.get(player.getServer()).getArea(type);
+		if (area == null) {
+			return false;
+		}
+
+		for (BlockEntity container : containers) {
+			ServerWorld containerWorld = container.getWorld() instanceof ServerWorld serverWorld
+					? serverWorld
+					: player.getServerWorld();
+			if (area.contains(containerWorld, container.getPos())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static void collectVillagerContainerBlocks(Inventory inventory, List<BlockEntity> containers) {
+		if (inventory instanceof ChestBlockEntity chest) {
+			containers.add(chest);
+			return;
+		}
+		if (inventory instanceof BarrelBlockEntity barrel) {
+			containers.add(barrel);
+			return;
+		}
+		if (inventory instanceof DoubleInventory doubleInventory) {
+			DoubleInventoryAccessor accessor = (DoubleInventoryAccessor) doubleInventory;
+			collectVillagerContainerBlocks(accessor.minefluence$getFirst(), containers);
+			collectVillagerContainerBlocks(accessor.minefluence$getSecond(), containers);
+		}
+	}
+
+	private static int countItems(Inventory inventory) {
+		int count = 0;
+		for (int slot = 0; slot < inventory.size(); slot++) {
+			ItemStack stack = inventory.getStack(slot);
+			if (!stack.isEmpty()) {
+				count += stack.getCount();
+			}
+		}
+		return count;
+	}
+
 	private static int countInventoryItems(ServerPlayerEntity player, Item item) {
 		PlayerInventory inventory = player.getInventory();
 		int count = 0;
@@ -334,5 +600,8 @@ public final class MineFluenceMissionProgressManager {
 					+ Math.min(farmland, MineFluenceBalance.FARMER_MISSION_7_FARMLAND_TARGET)
 					+ Math.min(composter, MineFluenceBalance.FARMER_MISSION_7_COMPOSTER_TARGET);
 		}
+	}
+
+	private record ContainerSnapshot(Inventory inventory, int itemCount) {
 	}
 }

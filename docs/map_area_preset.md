@@ -10,14 +10,16 @@ Preset coordinates are stored in:
 
 `src/main/java/net/jeongmin/modid/area/MineFluenceDemoMapPreset.java`
 
-The preset dimension is `minecraft:overworld`.
+The preset dimension is `minecraft:overworld`. The previous preset near the origin was replaced.
 
 Fixed areas:
 
-- `garden`: min=`(-15,-64,11)`, max=`(-6,-50,21)`
-- `farm`: min=`(5,-64,9)`, max=`(35,-50,37)`
-- `shared`: min=`(11,-64,-18)`, max=`(20,-50,-5)`
-- `farm_build`: min=`(-16,-64,23)`, max=`(-5,-50,34)`
+- `garden`: corners=`(-827,65,723)` and `(-839,65,711)`, stored min=`(-839,62,711)`, max=`(-827,71,723)`
+- `farm`: corners=`(-857,64,689)` and `(-839,64,709)`, stored min=`(-857,61,689)`, max=`(-839,70,709)`
+- `shared`: corners=`(-846,64,754)` and `(-833,65,764)`, stored min=`(-846,61,754)`, max=`(-833,71,764)`
+- `farm_build`: corners=`(-859,68,729)` and `(-867,68,723)`, stored min=`(-867,65,723)`, max=`(-859,74,729)`
+
+The stored Y range uses three blocks of padding below the lower corner and six blocks above the upper corner. Area bounds are inclusive.
 
 ## Mission Mapping
 
@@ -25,6 +27,9 @@ Fixed areas:
 - Good Mission 2 -> `farm`
 - Good Mission 6 -> `shared`
 - Good Mission 7 -> `farm_build`
+- Bad Mission 2 -> `farm`
+- Bad Mission 4 -> `shared`
+- Bad Mission 6 -> `farm`
 
 Missions without a required area do not show an area guide.
 
@@ -34,9 +39,11 @@ Run:
 
 `/minefluence area load_preset`
 
-This loads all required areas from the fixed demo map preset and overwrites existing configured areas.
+This loads all required areas from the new fixed demo map preset and overwrites existing configured areas. Repeated runs update the same four named entries rather than creating duplicates.
 
 `/minefluence start` and `/minefluence demo setup` also load missing preset areas automatically. They only fill missing areas and do not overwrite existing manual areas.
+
+Starting an area-based mission and using the smartphone `Show Mission Area` action also restore missing preset definitions. Existing custom or old saved definitions are preserved by automatic loading; run `/minefluence area load_preset` once to migrate them to the new map.
 
 Check the result with:
 
@@ -46,9 +53,9 @@ Check the result with:
 
 Mission area guidance uses particles only. It does not modify map blocks.
 
-While an active Good mission requires an area, MineFluence periodically highlights the configured box boundary with `happy_villager` particles and marks the area center with a small `end_rod` particle pillar.
+When a mapped mission starts or a player requests a guide, MineFluence highlights the configured box for about five seconds. Good routes use `happy_villager`, Bad routes use `angry_villager`, and manual commands use neutral `end_rod` boundary particles. Every guide also marks the center with an `end_rod` pillar.
 
-The guide renders at the area's center Y. For the fixed demo map boxes, this is around Y `-57`.
+The guide searches the configured Y range for open space above solid ground near the area center.
 
 ## Show An Area Manually
 
@@ -60,6 +67,8 @@ Use:
 - `/minefluence area show farm_build`
 
 The selected area is highlighted briefly with the same particle guide used by active missions.
+
+Use `/minefluence area info <area>` to inspect one saved area.
 
 ## Set An Exact Box
 
@@ -86,8 +95,8 @@ This stores a radius area centered on the player position.
 
 `/minefluence area list` shows shape and coordinates:
 
-- `garden: BOX min=(-15,-64,11), max=(-6,-50,21), dimension=minecraft:overworld`
-- `farm: BOX min=(5,-64,9), max=(35,-50,37), dimension=minecraft:overworld`
+- `garden: BOX min=(-839,62,711), max=(-827,71,723), dimension=minecraft:overworld`
+- `farm: BOX min=(-857,61,689), max=(-839,70,709), dimension=minecraft:overworld`
 - `shared: MISSING`
 
 ## Finding Coordinates

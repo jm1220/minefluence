@@ -31,8 +31,12 @@ public record MineFluencePhoneStateResponsePayload(
 		int invasionRemaining,
 		int invasionTotal,
 		boolean endingTriggered,
+		boolean exposureTriggered,
 		String endingName,
-		String weaponTier
+		boolean endingVideoAvailable,
+		String weaponTier,
+		int supportAllyCount,
+		String requiredAreaName
 ) implements CustomPayload {
 	private static final int MAX_STATE_LENGTH = 24;
 	private static final int MAX_ROUTE_LENGTH = 16;
@@ -42,11 +46,26 @@ public record MineFluencePhoneStateResponsePayload(
 	private static final int MAX_JOB_LENGTH = 32;
 	private static final int MAX_ENDING_LENGTH = 128;
 	private static final int MAX_WEAPON_LENGTH = 32;
+	private static final int MAX_AREA_LENGTH = 64;
 
-	public static final String STATE_MISSION_BOARD = "MISSION_BOARD";
-	public static final String STATE_POSTING = "POSTING";
-	public static final String STATE_STATUS = "STATUS";
-	public static final String STATE_GUIDANCE = "GUIDANCE";
+	public static final String STATE_NOT_STARTED = "NOT_STARTED";
+	public static final String STATE_CHOOSE_JOB = "CHOOSE_JOB";
+	public static final String STATE_READY = "READY";
+	public static final String STATE_MISSION_CHOICE = "MISSION_CHOICE";
+	public static final String STATE_MISSION_ACTIVE = "MISSION_ACTIVE";
+	public static final String STATE_READY_TO_UPLOAD = "READY_TO_UPLOAD";
+	public static final String STATE_INVASION = "INVASION";
+	public static final String STATE_ENDING = "ENDING";
+	public static final String STATE_EXPOSED = "EXPOSED";
+
+	@Deprecated
+	public static final String STATE_MISSION_BOARD = STATE_MISSION_CHOICE;
+	@Deprecated
+	public static final String STATE_POSTING = STATE_READY_TO_UPLOAD;
+	@Deprecated
+	public static final String STATE_STATUS = STATE_MISSION_ACTIVE;
+	@Deprecated
+	public static final String STATE_GUIDANCE = STATE_READY;
 
 	public static final CustomPayload.Id<MineFluencePhoneStateResponsePayload> ID =
 			new CustomPayload.Id<>(Identifier.of(MineFluence.MOD_ID, "phone_state_response"));
@@ -79,8 +98,12 @@ public record MineFluencePhoneStateResponsePayload(
 				buf.readVarInt(),
 				buf.readVarInt(),
 				buf.readBoolean(),
+				buf.readBoolean(),
 				buf.readString(MAX_ENDING_LENGTH),
-				buf.readString(MAX_WEAPON_LENGTH)
+				buf.readBoolean(),
+				buf.readString(MAX_WEAPON_LENGTH),
+				buf.readVarInt(),
+				buf.readString(MAX_AREA_LENGTH)
 		);
 	}
 
@@ -125,7 +148,11 @@ public record MineFluencePhoneStateResponsePayload(
 				0,
 				0,
 				false,
+				false,
 				"",
+				false,
+				"",
+				0,
 				""
 		);
 	}
@@ -155,13 +182,17 @@ public record MineFluencePhoneStateResponsePayload(
 		buf.writeVarInt(payload.invasionRemaining);
 		buf.writeVarInt(payload.invasionTotal);
 		buf.writeBoolean(payload.endingTriggered);
+		buf.writeBoolean(payload.exposureTriggered);
 		buf.writeString(safeString(payload.endingName), MAX_ENDING_LENGTH);
+		buf.writeBoolean(payload.endingVideoAvailable);
 		buf.writeString(safeString(payload.weaponTier), MAX_WEAPON_LENGTH);
+		buf.writeVarInt(payload.supportAllyCount);
+		buf.writeString(safeString(payload.requiredAreaName), MAX_AREA_LENGTH);
 	}
 
 	public static MineFluencePhoneStateResponsePayload guidance(String message) {
 		return new MineFluencePhoneStateResponsePayload(
-				STATE_GUIDANCE,
+				STATE_READY,
 				0,
 				"",
 				"",

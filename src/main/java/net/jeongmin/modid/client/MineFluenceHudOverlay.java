@@ -2,30 +2,43 @@ package net.jeongmin.modid.client;
 
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.jeongmin.modid.MineFluence;
-import net.jeongmin.modid.config.MineFluenceBalance;
 import net.jeongmin.modid.network.MineFluenceHudStatePayload;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
 
 public final class MineFluenceHudOverlay {
-	private static final boolean SHOW_LIE_GAUGE = true;
+	private static final boolean SHOW_RIGHT_STAT_PANEL = false;
+	private static final boolean SHOW_MISSION_LOCATOR_BAR = true;
+	private static final double MISSION_LOCATOR_FOV_DEGREES = 120.0;
+	private static final double MISSION_LOCATOR_NEAR_DISTANCE = 5.0;
+	private static final int MISSION_LOCATOR_BAR_WIDTH = 182;
 
 	private static final Identifier GOOD_ICON = Identifier.of(MineFluence.MOD_ID, "textures/gui/hud/good_icon.png");
 	private static final Identifier BAD_ICON = Identifier.of(MineFluence.MOD_ID, "textures/gui/hud/bad_icon.png");
 	private static final Identifier INVASION_ICON = Identifier.of(MineFluence.MOD_ID, "textures/gui/hud/invasion_icon.png");
-	private static final Identifier LIE_ICON = Identifier.of(MineFluence.MOD_ID, "textures/gui/hud/lie_icon.png");
 
 	private static final int CARD_WIDTH = 250;
 	private static final int OBJECTIVE_HEIGHT = 58;
 	private static final int STAT_ROW_HEIGHT = 22;
 	private static final int ICON_SIZE = 30;
 	private static final int SMALL_ICON_SIZE = 16;
+	private static final float HOTBAR_STAT_SCALE = 1.2F;
+	private static final int COMPACT_STAT_ICON_SIZE = 18;
+	private static final int COMPACT_STAT_TEXT_GAP = 5;
+	private static final int COMPACT_STAT_GROUP_GAP = 20;
 	private static final int SCREEN_MARGIN = 12;
+	private static final int COMPACT_STATS_BOTTOM_OFFSET = 90;
+	private static final int COMPACT_STATS_WITH_LOCATOR_BOTTOM_OFFSET = 90;
+	private static final int MISSION_LOCATOR_BOTTOM_OFFSET = 49;
 	private static final int CARD_BACKGROUND = 0xB812151B;
 	private static final int CARD_BORDER = 0x80394149;
 	private static final int BAR_BACKGROUND = 0x80272931;
+	private static final int LOCATOR_BAR_BACKGROUND = 0xA020242A;
+	private static final int LOCATOR_BAR_LINE = 0xB06D7680;
+	private static final int LOCATOR_MARKER_BORDER = 0xE0101216;
 	private static final int TEXT_COLOR = 0xFFECEFF2;
 	private static final int MUTED_TEXT_COLOR = 0xFFBAC2CC;
 	private static final int GOOD_COLOR = 0xFF4EBD73;
@@ -56,8 +69,16 @@ public final class MineFluenceHudOverlay {
 		int y = SCREEN_MARGIN;
 		boolean drewObjective = drawObjectiveCard(context, client.textRenderer, state, x, y, cardWidth);
 
-		int statsY = drewObjective ? y + OBJECTIVE_HEIGHT + 8 : y;
-		drawStatPanel(context, client.textRenderer, state, x, statsY, cardWidth);
+		if (SHOW_RIGHT_STAT_PANEL) {
+			int statsY = drewObjective ? y + OBJECTIVE_HEIGHT + 8 : y;
+			drawStatPanel(context, client.textRenderer, state, x, statsY, cardWidth);
+		}
+
+		MissionLocatorTarget locatorTarget = missionLocatorTarget(client, state);
+		drawCompactStats(context, client.textRenderer, state, locatorTarget != null);
+		if (locatorTarget != null) {
+			drawMissionLocator(context, state, locatorTarget);
+		}
 	}
 
 	private static boolean shouldSkip(MinecraftClient client) {
@@ -143,16 +164,185 @@ public final class MineFluenceHudOverlay {
 	}
 
 	private static void drawStatPanel(DrawContext context, TextRenderer textRenderer, MineFluenceHudStatePayload state, int x, int y, int width) {
-		int rowCount = SHOW_LIE_GAUGE ? 3 : 2;
+		int rowCount = 2;
 		int height = 12 + rowCount * STAT_ROW_HEIGHT;
 		drawCard(context, x, y, width, height, CARD_BORDER);
 
 		int rowY = y + 8;
 		drawStatRow(context, textRenderer, x, rowY, width, BAD_ICON, "Followers", Integer.toString(state.follower()), BAD_COLOR);
 		drawStatRow(context, textRenderer, x, rowY + STAT_ROW_HEIGHT, width, GOOD_ICON, "Social Credibility", signed(state.socialCredibility()), GOOD_COLOR);
-		if (SHOW_LIE_GAUGE) {
-			drawStatRow(context, textRenderer, x, rowY + STAT_ROW_HEIGHT * 2, width, LIE_ICON, "Lie Gauge", liePercent(state.lieValue()) + "%", INVASION_COLOR);
+	}
+
+	private static void drawCompactStats(
+			DrawContext context,
+			TextRenderer textRenderer,
+			MineFluenceHudStatePayload state,
+			boolean locatorVisible
+	) {
+		String followerText = Integer.toString(state.follower());
+		String trustText = signed(state.socialCredibility());
+		int followerTextWidth = scaledTextWidth(textRenderer, followerText);
+		int trustTextWidth = scaledTextWidth(textRenderer, trustText);
+		int followerWidth = COMPACT_STAT_ICON_SIZE + COMPACT_STAT_TEXT_GAP + followerTextWidth;
+		int trustWidth = COMPACT_STAT_ICON_SIZE + COMPACT_STAT_TEXT_GAP + trustTextWidth;
+		int totalWidth = followerWidth + COMPACT_STAT_GROUP_GAP + trustWidth;
+		int x = (context.getScaledWindowWidth() - totalWidth) / 2;
+		int bottomOffset = locatorVisible ? COMPACT_STATS_WITH_LOCATOR_BOTTOM_OFFSET : COMPACT_STATS_BOTTOM_OFFSET;
+		int y = Math.max(8, context.getScaledWindowHeight() - bottomOffset);
+
+		drawIcon(context, BAD_ICON, x, y, COMPACT_STAT_ICON_SIZE);
+		drawScaledText(
+				context,
+				textRenderer,
+				followerText,
+				x + COMPACT_STAT_ICON_SIZE + COMPACT_STAT_TEXT_GAP,
+				y + 3,
+				BAD_COLOR
+		);
+
+		int trustX = x + followerWidth + COMPACT_STAT_GROUP_GAP;
+		drawIcon(context, GOOD_ICON, trustX, y, COMPACT_STAT_ICON_SIZE);
+		drawScaledText(
+				context,
+				textRenderer,
+				trustText,
+				trustX + COMPACT_STAT_ICON_SIZE + COMPACT_STAT_TEXT_GAP,
+				y + 3,
+				GOOD_COLOR
+		);
+	}
+
+	private static int scaledTextWidth(TextRenderer textRenderer, String text) {
+		return Math.round(textRenderer.getWidth(text) * HOTBAR_STAT_SCALE);
+	}
+
+	private static void drawScaledText(
+			DrawContext context,
+			TextRenderer textRenderer,
+			String text,
+			int x,
+			int y,
+			int color
+	) {
+		int scaledX = Math.round(x / HOTBAR_STAT_SCALE);
+		int scaledY = Math.round(y / HOTBAR_STAT_SCALE);
+		context.getMatrices().push();
+		context.getMatrices().scale(HOTBAR_STAT_SCALE, HOTBAR_STAT_SCALE, 1.0F);
+		context.drawTextWithShadow(textRenderer, text, scaledX, scaledY, color);
+		context.getMatrices().pop();
+	}
+
+	private static MissionLocatorTarget missionLocatorTarget(
+			MinecraftClient client,
+			MineFluenceHudStatePayload state
+	) {
+		if (!SHOW_MISSION_LOCATOR_BAR
+				|| !state.hasActiveMissionArea()
+				|| state.activeMissionIndex() <= 0
+				|| state.waitingForPosting()
+				|| state.activeMissionProgress() >= state.activeMissionTarget()
+				|| state.activeMissionAreaName().isBlank()
+				|| state.activeMissionAreaDimension().isBlank()) {
+			return null;
 		}
+
+		String currentDimension = client.world.getRegistryKey().getValue().toString();
+		if (!state.activeMissionAreaDimension().equals(currentDimension)) {
+			return null;
+		}
+
+		double centerX = (state.activeMissionAreaMinX() + state.activeMissionAreaMaxX()) / 2.0;
+		double centerY = (state.activeMissionAreaMinY() + state.activeMissionAreaMaxY()) / 2.0;
+		double centerZ = (state.activeMissionAreaMinZ() + state.activeMissionAreaMaxZ()) / 2.0;
+		double deltaX = centerX - client.player.getX();
+		double deltaZ = centerZ - client.player.getZ();
+		double horizontalDistance = Math.hypot(deltaX, deltaZ);
+		boolean insideArea = isInsideArea(client, state);
+		boolean nearby = insideArea || horizontalDistance <= MISSION_LOCATOR_NEAR_DISTANCE;
+
+		double deltaAngle = 0.0;
+		if (!nearby && horizontalDistance > 0.0001) {
+			double angleToTarget = Math.toDegrees(Math.atan2(-deltaX, deltaZ));
+			double cameraYaw = client.gameRenderer.getCamera().getYaw();
+			deltaAngle = MathHelper.wrapDegrees(angleToTarget - cameraYaw);
+		}
+
+		return new MissionLocatorTarget(centerY - client.player.getY(), horizontalDistance, deltaAngle, nearby);
+	}
+
+	private static boolean isInsideArea(MinecraftClient client, MineFluenceHudStatePayload state) {
+		double playerX = client.player.getX();
+		double playerY = client.player.getY();
+		double playerZ = client.player.getZ();
+		return playerX >= state.activeMissionAreaMinX()
+				&& playerX < state.activeMissionAreaMaxX() + 1.0
+				&& playerY >= state.activeMissionAreaMinY()
+				&& playerY < state.activeMissionAreaMaxY() + 1.0
+				&& playerZ >= state.activeMissionAreaMinZ()
+				&& playerZ < state.activeMissionAreaMaxZ() + 1.0;
+	}
+
+	private static void drawMissionLocator(
+			DrawContext context,
+			MineFluenceHudStatePayload state,
+			MissionLocatorTarget target
+	) {
+		int centerX = context.getScaledWindowWidth() / 2;
+		int barY = context.getScaledWindowHeight() - MISSION_LOCATOR_BOTTOM_OFFSET;
+		int barLeft = centerX - MISSION_LOCATOR_BAR_WIDTH / 2;
+		double halfFov = MISSION_LOCATOR_FOV_DEGREES / 2.0;
+		double normalizedAngle = MathHelper.clamp(target.deltaAngle() / halfFov, -1.0, 1.0);
+		int markerX = target.nearby()
+				? centerX
+				: centerX + (int) Math.round(normalizedAngle * (MISSION_LOCATOR_BAR_WIDTH / 2.0));
+		int markerRadius = target.horizontalDistance() <= 10.0 ? 4
+				: target.horizontalDistance() <= 30.0 ? 3 : 2;
+		int markerColor = "BAD".equalsIgnoreCase(state.activeMissionRoute()) ? BAD_COLOR : GOOD_COLOR;
+
+		context.fill(barLeft, barY - 1, barLeft + MISSION_LOCATOR_BAR_WIDTH, barY + 2, LOCATOR_BAR_BACKGROUND);
+		context.fill(barLeft + 1, barY, barLeft + MISSION_LOCATOR_BAR_WIDTH - 1, barY + 1, LOCATOR_BAR_LINE);
+		context.fill(barLeft, barY - 3, barLeft + 1, barY + 4, LOCATOR_BAR_LINE);
+		context.fill(
+				barLeft + MISSION_LOCATOR_BAR_WIDTH - 1,
+				barY - 3,
+				barLeft + MISSION_LOCATOR_BAR_WIDTH,
+				barY + 4,
+				LOCATOR_BAR_LINE
+		);
+		drawDiamond(context, markerX, barY, markerRadius + 1, LOCATOR_MARKER_BORDER);
+		drawDiamond(context, markerX, barY, markerRadius, markerColor);
+		if (Math.abs(target.verticalDelta()) > 5.0) {
+			int hintX = markerX >= centerX
+					? markerX - markerRadius - 5
+					: markerX + markerRadius + 5;
+			drawVerticalHint(context, hintX, barY, target.verticalDelta() > 0.0, TEXT_COLOR);
+		}
+	}
+
+	private static void drawDiamond(DrawContext context, int centerX, int centerY, int radius, int color) {
+		for (int yOffset = -radius; yOffset <= radius; yOffset++) {
+			int halfWidth = radius - Math.abs(yOffset);
+			context.fill(
+					centerX - halfWidth,
+					centerY + yOffset,
+					centerX + halfWidth + 1,
+					centerY + yOffset + 1,
+					color
+			);
+		}
+	}
+
+	private static void drawVerticalHint(DrawContext context, int x, int y, boolean pointsUp, int color) {
+		if (pointsUp) {
+			context.fill(x, y - 3, x + 1, y + 3, color);
+			context.fill(x - 1, y - 2, x + 2, y - 1, color);
+			context.fill(x - 2, y - 1, x + 3, y, color);
+			return;
+		}
+
+		context.fill(x, y - 2, x + 1, y + 4, color);
+		context.fill(x - 1, y + 1, x + 2, y + 2, color);
+		context.fill(x - 2, y + 2, x + 3, y + 3, color);
 	}
 
 	private static void drawStatRow(
@@ -201,14 +391,18 @@ public final class MineFluenceHudOverlay {
 	}
 
 	private static String signed(int value) {
-		if (value >= 0) {
+		if (value > 0) {
 			return "+" + value;
 		}
 		return Integer.toString(value);
 	}
 
-	private static int liePercent(int lieValue) {
-		int max = Math.max(1, MineFluenceBalance.LIE_VALUE_MAX);
-		return Math.max(0, Math.min(100, lieValue * 100 / max));
+	private record MissionLocatorTarget(
+			double verticalDelta,
+			double horizontalDistance,
+			double deltaAngle,
+			boolean nearby
+	) {
 	}
+
 }

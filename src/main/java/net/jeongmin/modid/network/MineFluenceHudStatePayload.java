@@ -18,6 +18,15 @@ public record MineFluenceHudStatePayload(
 		String activeMissionObjective,
 		int activeMissionProgress,
 		int activeMissionTarget,
+		boolean hasActiveMissionArea,
+		String activeMissionAreaName,
+		String activeMissionAreaDimension,
+		int activeMissionAreaMinX,
+		int activeMissionAreaMinY,
+		int activeMissionAreaMinZ,
+		int activeMissionAreaMaxX,
+		int activeMissionAreaMaxY,
+		int activeMissionAreaMaxZ,
 		boolean waitingForPosting,
 		int pendingPostingMissionIndex,
 		String pendingPostingRoute,
@@ -30,6 +39,8 @@ public record MineFluenceHudStatePayload(
 	private static final int MAX_ROUTE_LENGTH = 16;
 	private static final int MAX_TITLE_LENGTH = 128;
 	private static final int MAX_OBJECTIVE_LENGTH = 512;
+	private static final int MAX_AREA_NAME_LENGTH = 32;
+	private static final int MAX_DIMENSION_LENGTH = 128;
 	private static final int MAX_ENDING_LENGTH = 128;
 
 	public static final CustomPayload.Id<MineFluenceHudStatePayload> ID =
@@ -48,6 +59,15 @@ public record MineFluenceHudStatePayload(
 				buf.readString(MAX_ROUTE_LENGTH),
 				buf.readString(MAX_TITLE_LENGTH),
 				buf.readString(MAX_OBJECTIVE_LENGTH),
+				buf.readVarInt(),
+				buf.readVarInt(),
+				buf.readBoolean(),
+				buf.readString(MAX_AREA_NAME_LENGTH),
+				buf.readString(MAX_DIMENSION_LENGTH),
+				buf.readVarInt(),
+				buf.readVarInt(),
+				buf.readVarInt(),
+				buf.readVarInt(),
 				buf.readVarInt(),
 				buf.readVarInt(),
 				buf.readBoolean(),
@@ -72,6 +92,15 @@ public record MineFluenceHudStatePayload(
 		buf.writeString(safeString(payload.activeMissionObjective, MAX_OBJECTIVE_LENGTH), MAX_OBJECTIVE_LENGTH);
 		buf.writeVarInt(payload.activeMissionProgress);
 		buf.writeVarInt(payload.activeMissionTarget);
+		buf.writeBoolean(payload.hasActiveMissionArea);
+		buf.writeString(safeString(payload.activeMissionAreaName, MAX_AREA_NAME_LENGTH), MAX_AREA_NAME_LENGTH);
+		buf.writeString(safeString(payload.activeMissionAreaDimension, MAX_DIMENSION_LENGTH), MAX_DIMENSION_LENGTH);
+		buf.writeVarInt(payload.activeMissionAreaMinX);
+		buf.writeVarInt(payload.activeMissionAreaMinY);
+		buf.writeVarInt(payload.activeMissionAreaMinZ);
+		buf.writeVarInt(payload.activeMissionAreaMaxX);
+		buf.writeVarInt(payload.activeMissionAreaMaxY);
+		buf.writeVarInt(payload.activeMissionAreaMaxZ);
 		buf.writeBoolean(payload.waitingForPosting);
 		buf.writeVarInt(payload.pendingPostingMissionIndex);
 		buf.writeString(safeString(payload.pendingPostingRoute, MAX_ROUTE_LENGTH), MAX_ROUTE_LENGTH);

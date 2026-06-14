@@ -5,7 +5,9 @@ import net.jeongmin.modid.area.MineFluenceAreaGuideManager;
 import net.jeongmin.modid.billboard.MineFluenceBillboards;
 import net.jeongmin.modid.command.MineFluenceCommands;
 import net.jeongmin.modid.entity.MineFluenceEntities;
+import net.jeongmin.modid.fan.MineFluenceFanVillagers;
 import net.jeongmin.modid.invasion.MineFluenceInvasionManager;
+import net.jeongmin.modid.invasion.MineFluenceInvasionSupportManager;
 import net.jeongmin.modid.item.MineFluenceItems;
 import net.jeongmin.modid.mission.MineFluenceMissionProgressManager;
 import net.jeongmin.modid.network.MineFluenceNetworking;
@@ -30,6 +32,8 @@ public class MineFluence implements ModInitializer {
 		MineFluenceNetworking.register();
 		MineFluenceHud.register();
 		MineFluenceCommands.register();
+		MineFluenceFanVillagers.register();
+		MineFluenceInvasionSupportManager.register();
 		MineFluenceInvasionManager.register();
 		MineFluenceMissionProgressManager.register();
 		MineFluenceAreaGuideManager.register();

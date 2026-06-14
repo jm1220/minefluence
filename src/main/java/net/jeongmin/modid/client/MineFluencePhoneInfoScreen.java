@@ -16,7 +16,7 @@ public class MineFluencePhoneInfoScreen extends Screen {
 	private ButtonWidget closeButton;
 
 	public MineFluencePhoneInfoScreen(MineFluencePhoneStateResponsePayload state) {
-		super(Text.literal(state.state().equals(MineFluencePhoneStateResponsePayload.STATE_STATUS) ? "MineFluence Mission Status" : "MineFluence Phone"));
+		super(Text.literal(state.state().equals(MineFluencePhoneStateResponsePayload.STATE_MISSION_ACTIVE) ? "MineFluence Mission Status" : "MineFluence Phone"));
 		this.state = state;
 		this.message = state.message();
 	}

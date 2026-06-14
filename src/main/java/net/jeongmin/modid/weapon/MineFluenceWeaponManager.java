@@ -43,6 +43,22 @@ public final class MineFluenceWeaponManager {
 		return MineFluenceWeaponTier.WOOD;
 	}
 
+	public static MineFluenceWeaponTier tierForFarmerDemoWeapon(ItemStack stack) {
+		if (stack == null || stack.isEmpty()) {
+			return null;
+		}
+		for (MineFluenceWeaponTier tier : MineFluenceWeaponTier.values()) {
+			if (stack.isOf(tier.farmerDemoItem())) {
+				return tier;
+			}
+		}
+		return null;
+	}
+
+	public static boolean isFarmerDemoWeapon(ItemStack stack) {
+		return tierForFarmerDemoWeapon(stack) != null;
+	}
+
 	public static MineFluenceWeaponTier updateWeapon(ServerPlayerEntity player, MineFluencePlayerData data) {
 		MineFluenceWeaponTier expectedTier = determineTier(data.getFollower());
 		MineFluenceWeaponTier previousTier = data.getCurrentWeaponTier();

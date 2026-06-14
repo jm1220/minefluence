@@ -38,6 +38,9 @@ public final class MineFluenceEndingManager {
 	}
 
 	public static MineFluenceEnding getEnding(MineFluencePlayerData data) {
+		if (data.isExposureTriggered()) {
+			return famousVillainEnding();
+		}
 		return MineFluenceEndingRegistry.get(
 				calculateFollowerTier(data.getFollower()),
 				calculateSocialTier(data.getSocialCredibility())
@@ -60,17 +63,40 @@ public final class MineFluenceEndingManager {
 	}
 
 	public static MineFluenceEnding triggerEnding(ServerPlayerEntity player, MineFluencePlayerData data) {
-		MineFluenceEnding ending = getEnding(data);
 		boolean wasAlreadyTriggered = data.isEndingTriggered();
-		data.setEndingTriggered(true);
-		data.setEndingId(ending.id());
-		MineFluenceWorldState.get(player.getServer()).markDirty();
+		MineFluenceEnding ending = wasAlreadyTriggered ? endingFromTriggeredData(data) : getEnding(data);
+		if (!wasAlreadyTriggered) {
+			data.setEndingTriggered(true);
+			data.setEndingId(ending.id());
+			MineFluenceWorldState.get(player.getServer()).markDirty();
+		}
 		showEndingSummary(player, data, ending, true);
 		if (!wasAlreadyTriggered && isTheFamousVillainEnding(ending)) {
 			MineFluenceEndingVideoLauncher.launchTheFamousVillain(player);
 		}
 		MineFluenceHud.refresh(player, data);
 		return ending;
+	}
+
+	public static boolean triggerExposureCollapse(ServerPlayerEntity player, MineFluencePlayerData data) {
+		if (data.isExposureTriggered()) {
+			return false;
+		}
+
+		MineFluenceEnding ending = famousVillainEnding();
+		data.setExposureTriggered(true);
+		data.setEndingTriggered(true);
+		data.setEndingId(ending.id());
+		data.clearMissionFlow();
+		data.clearInvasionState();
+		MineFluenceWorldState.get(player.getServer()).markDirty();
+
+		MineFluenceDisplay.sendChat(player, "Your lies have been exposed.");
+		MineFluenceDisplay.sendChat(player, "Everything collapses.");
+		showEndingSummary(player, data, ending, true);
+		MineFluenceEndingVideoLauncher.launchTheFamousVillain(player);
+		MineFluenceHud.refresh(player, data);
+		return true;
 	}
 
 	public static MineFluenceEnding previewEnding(ServerPlayerEntity player, MineFluencePlayerData data) {
@@ -116,6 +142,15 @@ public final class MineFluenceEndingManager {
 			return true;
 		}
 		return ending.followerTier() == MineFluenceEndingTier.HIGH && ending.socialTier() == MineFluenceEndingTier.LOW;
+	}
+
+	private static MineFluenceEnding famousVillainEnding() {
+		return MineFluenceEndingRegistry.getById(MineFluenceEndingVideoLauncher.THE_FAMOUS_VILLAIN_ID)
+				.orElseGet(() -> MineFluenceEndingRegistry.get(MineFluenceEndingTier.HIGH, MineFluenceEndingTier.LOW));
+	}
+
+	private static MineFluenceEnding endingFromTriggeredData(MineFluencePlayerData data) {
+		return MineFluenceEndingRegistry.getById(data.getEndingId()).orElseGet(() -> getEnding(data));
 	}
 
 	private static void showEndingSummary(ServerPlayerEntity player, MineFluencePlayerData data, MineFluenceEnding ending, boolean triggered) {

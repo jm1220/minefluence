@@ -6,6 +6,8 @@ import net.jeongmin.modid.billboard.MineFluenceBillboards;
 import net.jeongmin.modid.billboard.PostingStyle;
 import net.jeongmin.modid.data.MineFluencePlayerData;
 import net.jeongmin.modid.data.MineFluenceWorldState;
+import net.jeongmin.modid.ending.MineFluenceEndingManager;
+import net.jeongmin.modid.fan.MineFluenceFanVillagers;
 import net.jeongmin.modid.invasion.MineFluenceInvasionManager;
 import net.jeongmin.modid.ui.MineFluenceDisplay;
 import net.jeongmin.modid.weapon.MineFluenceWeaponManager;
@@ -30,7 +32,6 @@ public final class MineFluencePostingService {
 
 		int beforeFollower = data.getFollower();
 		int beforeSocial = data.getSocialCredibility();
-		int beforeLie = data.getLieValue();
 
 		MineFluencePlayerData updatedData = state.updatePlayerData(player, playerData -> {
 			playerData.addFollower(preview.followerReward());
@@ -44,17 +45,22 @@ public final class MineFluencePostingService {
 
 		int appliedFollower = updatedData.getFollower() - beforeFollower;
 		int appliedSocial = updatedData.getSocialCredibility() - beforeSocial;
-		int appliedLie = updatedData.getLieValue() - beforeLie;
 
 		MineFluenceDisplay.sendChat(player, exaggerated ? "Posted exaggerated." : "Posted normally.");
-		if (appliedLie > 0) {
-			MineFluenceDisplay.sendChat(player, "Follower " + signed(appliedFollower) + ", Social Credibility " + signed(appliedSocial) + ", Lie Value " + signed(appliedLie) + ".");
-		} else {
-			MineFluenceDisplay.sendChat(player, "Follower " + signed(appliedFollower) + ", Social Credibility " + signed(appliedSocial) + ".");
+		MineFluenceDisplay.sendChat(player, "Follower " + signed(appliedFollower) + ", Social Credibility " + signed(appliedSocial) + ".");
+		if (exaggerated && preview.lieValueIncrease() > 0) {
+			MineFluenceDisplay.sendChat(player, "Your story spreads further... but something feels risky.");
 		}
 		MineFluenceDisplay.sendChat(player, "Mission " + updatedData.getCompletedMissionCount() + "/" + MineFluenceBalance.TOTAL_DEMO_MISSIONS + " completed.");
 		MineFluenceWeaponManager.updateWeapon(player, updatedData);
+		MineFluenceFanVillagers.syncFanVillagers(player);
 		updateUploadedMissionBillboards(player, mission, exaggerated);
+		if (exaggerated
+				&& preview.lieValueIncrease() > 0
+				&& updatedData.getLieValue() >= MineFluenceBalance.LIE_EXPOSURE_THRESHOLD
+				&& MineFluenceEndingManager.triggerExposureCollapse(player, updatedData)) {
+			return true;
+		}
 		startInvasionIfDue(player, updatedData);
 		MineFluenceDisplay.sendStatusActionBar(player, updatedData);
 		return true;
@@ -68,7 +74,7 @@ public final class MineFluencePostingService {
 		if (exaggerated) {
 			followerReward = (int) Math.round(followerReward * MineFluenceBalance.EXAGGERATED_POST_MULTIPLIER);
 			socialReward = (int) Math.round(socialReward * MineFluenceBalance.EXAGGERATED_POST_MULTIPLIER);
-			lieReward = MineFluenceBalance.LIE_VALUE_PER_EXAGGERATED_POST;
+			lieReward = MineFluenceBalance.getLieIncreaseForMission(mission.index());
 		}
 
 		return new RewardPreview(followerReward, socialReward, lieReward);

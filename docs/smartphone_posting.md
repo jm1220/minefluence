@@ -20,7 +20,7 @@ Right-clicking `minefluence:smartphone` asks the server for the current phone st
 - Completed mission waiting for posting: opens the upload/posting screen.
 - No pending mission flow: opens a guidance screen, usually prompting `/minefluence mission next`.
 
-The existing `M` key still opens the mission board directly.
+The old `M` key mission-board shortcut has been removed.
 
 ## Upload Screen
 

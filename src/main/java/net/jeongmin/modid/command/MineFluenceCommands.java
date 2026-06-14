@@ -8,7 +8,6 @@ import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
 import java.util.Locale;
-import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -32,13 +31,19 @@ import net.jeongmin.modid.ending.MineFluenceEnding;
 import net.jeongmin.modid.ending.MineFluenceEndingManager;
 import net.jeongmin.modid.ending.MineFluenceEndingTier;
 import net.jeongmin.modid.ending.MineFluenceEndingVideoLauncher;
+import net.jeongmin.modid.fan.MineFluenceFanVillagers;
+import net.jeongmin.modid.fan.MineFluenceFanVillagers.SyncResult;
 import net.jeongmin.modid.invasion.MineFluenceInvasionManager;
+import net.jeongmin.modid.invasion.MineFluenceInvasionSupportManager;
+import net.jeongmin.modid.invasion.MineFluenceInvasionSupportManager.SpawnResult;
 import net.jeongmin.modid.item.MineFluenceItems;
 import net.jeongmin.modid.mission.FarmerMissions;
 import net.jeongmin.modid.mission.MineFluenceMission;
+import net.jeongmin.modid.mission.MineFluenceMissionCompletionService;
 import net.jeongmin.modid.mission.MineFluenceMissionProgressManager;
 import net.jeongmin.modid.mission.MineFluenceMissionRoute;
 import net.jeongmin.modid.mission.MineFluenceMissionSelectionService;
+import net.jeongmin.modid.mission.MineFluenceMissionSupplies;
 import net.jeongmin.modid.mission.MineFluencePostingService;
 import net.jeongmin.modid.network.MineFluenceNetworking;
 import net.jeongmin.modid.ui.MineFluenceDisplay;
@@ -82,6 +87,13 @@ public final class MineFluenceCommands {
 						.then(literal("hud")
 								.then(literal("refresh")
 										.executes(MineFluenceCommands::refreshHud)))
+						.then(literal("fans")
+								.then(literal("sync")
+										.executes(MineFluenceCommands::syncFans))
+								.then(literal("clear")
+										.executes(MineFluenceCommands::clearFans))
+								.then(literal("count")
+										.executes(MineFluenceCommands::countFans)))
 						.then(literal("billboard")
 								.then(literal("give")
 										.executes(MineFluenceCommands::giveBillboard))
@@ -202,6 +214,15 @@ public final class MineFluenceCommands {
 										.executes(MineFluenceCommands::loadAreaPreset))
 								.then(literal("list")
 										.executes(MineFluenceCommands::listAreas))
+								.then(literal("info")
+										.then(literal("garden")
+												.executes(context -> showAreaInfo(context, MineFluenceAreaType.GARDEN)))
+										.then(literal("farm")
+												.executes(context -> showAreaInfo(context, MineFluenceAreaType.FARM)))
+										.then(literal("shared")
+												.executes(context -> showAreaInfo(context, MineFluenceAreaType.SHARED_SPACE)))
+										.then(literal("farm_build")
+												.executes(context -> showAreaInfo(context, MineFluenceAreaType.FARM_BUILD_AREA))))
 								.then(literal("show")
 										.then(literal("garden")
 												.executes(context -> showAreaGuide(context, MineFluenceAreaType.GARDEN)))
@@ -233,6 +254,13 @@ public final class MineFluenceCommands {
 												.executes(context -> startInvasionDebug(context, getInteger(context, "index")))))
 								.then(literal("stop_debug")
 										.executes(MineFluenceCommands::stopInvasionDebug)))
+						.then(literal("support")
+								.then(literal("count")
+										.executes(MineFluenceCommands::countSupportAllies))
+								.then(literal("spawn")
+										.executes(MineFluenceCommands::spawnSupportAllies))
+								.then(literal("clear")
+										.executes(MineFluenceCommands::clearSupportAllies)))
 						.then(literal("weapon")
 								.then(literal("status")
 										.executes(MineFluenceCommands::showWeaponStatus))
@@ -329,6 +357,33 @@ public final class MineFluenceCommands {
 		MineFluencePlayerData data = MineFluenceWorldState.get(source.getServer()).getPlayerData(player);
 		MineFluenceHud.refresh(player, data);
 		MineFluenceDisplay.sendChat(source, "HUD refreshed.");
+		return 1;
+	}
+
+	private static int syncFans(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+		ServerCommandSource source = context.getSource();
+		SyncResult result = MineFluenceFanVillagers.syncFanVillagers(source.getPlayerOrThrow());
+		MineFluenceDisplay.sendChat(source, "Fans synced: current=" + result.currentCount()
+				+ ", target=" + result.targetCount()
+				+ ", spawned=" + result.spawnedCount()
+				+ ", removed=" + result.removedCount() + ".");
+		return 1;
+	}
+
+	private static int clearFans(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+		ServerCommandSource source = context.getSource();
+		int removed = MineFluenceFanVillagers.clearFanVillagers(source.getPlayerOrThrow());
+		MineFluenceDisplay.sendChat(source, "Cleared " + removed + " MineFluence fan villager(s).");
+		return 1;
+	}
+
+	private static int countFans(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+		ServerCommandSource source = context.getSource();
+		ServerPlayerEntity player = source.getPlayerOrThrow();
+		MineFluencePlayerData data = MineFluenceWorldState.get(source.getServer()).getPlayerData(player);
+		int current = MineFluenceFanVillagers.countFanVillagers(player);
+		int target = MineFluenceBalance.getTargetFanCount(data.getFollower());
+		MineFluenceDisplay.sendChat(source, "Fan villagers: current=" + current + ", target=" + target + ", followers=" + data.getFollower() + ".");
 		return 1;
 	}
 
@@ -462,6 +517,7 @@ public final class MineFluenceCommands {
 		MineFluenceWorldState state = MineFluenceWorldState.get(source.getServer());
 		MineFluencePlayerData currentData = state.getPlayerData(player);
 		MineFluenceInvasionManager.clearInvasionForReset(player, currentData);
+		MineFluenceFanVillagers.clearFanVillagers(player);
 		MineFluencePlayerData data = state.updatePlayerData(player, playerData -> {
 			playerData.resetForDemoStart();
 			playerData.setSelectedJob(MineFluenceJob.FARMER);
@@ -469,6 +525,7 @@ public final class MineFluenceCommands {
 		MineFluenceWeaponManager.updateWeapon(player, data);
 		MineFluenceItems.ensureSingleSmartphone(player);
 		loadMissingDemoMapPresetAreas(source, state);
+		MineFluenceFanVillagers.syncFanVillagers(player);
 
 		MineFluenceDisplay.sendChat(source, "Demo setup complete. Clean state started with Farmer selected.");
 		MineFluenceDisplay.sendChat(source, "Use /minefluence mission next to choose a route, or /minefluence demo quick_normal to advance one Good mission. The smartphone and M key open the mission board.");
@@ -624,15 +681,15 @@ public final class MineFluenceCommands {
 		}
 
 		MineFluenceMission mission = missionOrFallback(data.getActiveMissionIndex(), data.getActiveMissionRoute());
-		MineFluencePlayerData updatedData = state.updatePlayerData(player, playerData -> {
-			playerData.setActiveMissionProgress(mission.targetProgress());
-			playerData.markActiveMissionReadyToPost();
-		});
+		if (!MineFluenceMissionCompletionService.complete(player, state, data, mission)) {
+			MineFluenceDisplay.sendChat(source, "Mission could not be completed because its state changed.");
+			return 0;
+		}
 		MineFluenceDisplay.sendChat(source, "Mission objective completed: " + mission.route() + " - " + mission.title() + ".");
 		MineFluenceDisplay.sendChat(source, "Choose posting style:");
 		MineFluenceDisplay.sendChat(source, "/minefluence post normal");
 		MineFluenceDisplay.sendChat(source, "/minefluence post exaggerate");
-		MineFluenceDisplay.sendStatusActionBar(player, updatedData);
+		MineFluenceDisplay.sendStatusActionBar(player, data);
 		return 1;
 	}
 
@@ -652,7 +709,11 @@ public final class MineFluenceCommands {
 		}
 
 		int remaining = MineFluenceInvasionManager.countRemainingTrackedMobs(source.getServer(), data);
-		MineFluenceDisplay.sendChat(source, "Active invasion=" + data.getActiveInvasionIndex() + ", Invaders remaining=" + remaining + ", Tracked mobs=" + data.getTrackedInvasionMobCount() + ".");
+		int supportAllies = MineFluenceInvasionSupportManager.countSupportAllies(player);
+		MineFluenceDisplay.sendChat(source, "Active invasion=" + data.getActiveInvasionIndex()
+				+ ", Invaders remaining=" + remaining
+				+ ", Tracked mobs=" + data.getTrackedInvasionMobCount()
+				+ ", Village defenders=" + supportAllies + ".");
 		MineFluenceDisplay.sendActionBar(player, "[MineFluence] Invasion " + data.getActiveInvasionIndex() + ": Invaders remaining " + remaining);
 		return 1;
 	}
@@ -678,6 +739,33 @@ public final class MineFluenceCommands {
 		ServerPlayerEntity player = source.getPlayerOrThrow();
 		MineFluencePlayerData data = MineFluenceWorldState.get(source.getServer()).getPlayerData(player);
 		MineFluenceInvasionManager.stopInvasionDebug(player, data);
+		return 1;
+	}
+
+	private static int countSupportAllies(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+		ServerCommandSource source = context.getSource();
+		ServerPlayerEntity player = source.getPlayerOrThrow();
+		MineFluencePlayerData data = MineFluenceWorldState.get(source.getServer()).getPlayerData(player);
+		int currentCount = MineFluenceInvasionSupportManager.countSupportAllies(player);
+		int targetCount = MineFluenceBalance.getInvasionSupportCount(data.getSocialCredibility());
+		MineFluenceDisplay.sendChat(source, "Village defenders: current=" + currentCount
+				+ ", target=" + targetCount
+				+ ", Social Credibility=" + data.getSocialCredibility() + ".");
+		return 1;
+	}
+
+	private static int spawnSupportAllies(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+		ServerCommandSource source = context.getSource();
+		SpawnResult result = MineFluenceInvasionSupportManager.spawnForTesting(source.getPlayerOrThrow());
+		MineFluenceDisplay.sendChat(source, "Support test spawn: spawned=" + result.spawnedCount()
+				+ ", target=" + result.targetCount() + ".");
+		return 1;
+	}
+
+	private static int clearSupportAllies(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+		ServerCommandSource source = context.getSource();
+		int removed = MineFluenceInvasionSupportManager.clearSupportAllies(source.getPlayerOrThrow());
+		MineFluenceDisplay.sendChat(source, "Cleared " + removed + " MineFluence village defender(s).");
 		return 1;
 	}
 
@@ -737,6 +825,18 @@ public final class MineFluenceCommands {
 				MineFluenceDisplay.sendChat(source, type.commandName() + ": " + area.describe());
 			}
 		}
+		return 1;
+	}
+
+	private static int showAreaInfo(CommandContext<ServerCommandSource> context, MineFluenceAreaType type) {
+		ServerCommandSource source = context.getSource();
+		MineFluenceArea area = MineFluenceWorldState.get(source.getServer()).getArea(type);
+		if (area == null) {
+			MineFluenceDisplay.sendChat(source, type.commandName() + ": MISSING. Run /minefluence area load_preset.");
+			return 0;
+		}
+
+		MineFluenceDisplay.sendChat(source, type.commandName() + ": " + area.describe());
 		return 1;
 	}
 
@@ -828,6 +928,7 @@ public final class MineFluenceCommands {
 			playerData.clearEndingState();
 		});
 		MineFluenceWeaponManager.updateWeapon(player, data);
+		MineFluenceFanVillagers.syncFanVillagers(player);
 		MineFluenceEnding ending = MineFluenceEndingManager.getEnding(data);
 		MineFluenceDisplay.sendChat(source, "Ending test values set: Follower=" + data.getFollower() + " (" + followerTier + "), Social Credibility=" + data.getSocialCredibility() + " (" + socialTier + ").");
 		MineFluenceDisplay.sendChat(source, "Current calculated ending: " + ending.displayName() + ".");
@@ -850,7 +951,9 @@ public final class MineFluenceCommands {
 		MineFluenceWorldState state = MineFluenceWorldState.get(source.getServer());
 		MineFluencePlayerData currentData = state.getPlayerData(player);
 		MineFluenceInvasionManager.clearInvasionForReset(player, currentData);
+		MineFluenceFanVillagers.clearFanVillagers(player);
 		MineFluencePlayerData data = state.resetPlayerData(player);
+		MineFluenceFanVillagers.syncFanVillagers(player);
 		MineFluenceWeaponManager.updateWeapon(player, data);
 		MineFluenceDisplay.sendChat(source, "Stats reset. " + shortStats(data));
 		MineFluenceDisplay.sendStatusActionBar(player, data);
@@ -858,7 +961,9 @@ public final class MineFluenceCommands {
 	}
 
 	private static int setFollower(CommandContext<ServerCommandSource> context, int value) throws CommandSyntaxException {
-		return updateWeaponAfterDataChange(context, data -> data.setFollower(value), data -> "Follower set to " + data.getFollower() + ".");
+		int result = updateWeaponAfterDataChange(context, data -> data.setFollower(value), data -> "Follower set to " + data.getFollower() + ".");
+		MineFluenceFanVillagers.syncFanVillagers(context.getSource().getPlayerOrThrow());
+		return result;
 	}
 
 	private static int setSocialCredibility(CommandContext<ServerCommandSource> context, int value) throws CommandSyntaxException {
@@ -874,7 +979,9 @@ public final class MineFluenceCommands {
 	}
 
 	private static int addFollower(CommandContext<ServerCommandSource> context, int delta) throws CommandSyntaxException {
-		return updateWeaponAfterDataChange(context, data -> data.addFollower(delta), data -> "Follower changed by " + signed(delta) + " to " + data.getFollower() + ".");
+		int result = updateWeaponAfterDataChange(context, data -> data.addFollower(delta), data -> "Follower changed by " + signed(delta) + " to " + data.getFollower() + ".");
+		MineFluenceFanVillagers.syncFanVillagers(context.getSource().getPlayerOrThrow());
+		return result;
 	}
 
 	private static int addSocialCredibility(CommandContext<ServerCommandSource> context, int delta) throws CommandSyntaxException {
@@ -942,7 +1049,7 @@ public final class MineFluenceCommands {
 		MineFluenceDisplay.sendChat(source, "Objective: " + mission.objectiveText());
 		MineFluenceDisplay.sendChat(source, "Target: " + mission.targetProgress());
 		MineFluenceDisplay.sendChat(source, "Base rewards: Follower " + signed(mission.baseFollowerReward()) + ", Social Credibility " + signed(mission.baseSocialCredibilityReward()) + ".");
-		if (mission.route() == MineFluenceMissionRoute.BAD) {
+		if (mission.route() == MineFluenceMissionRoute.BAD && !MineFluenceMissionProgressManager.hasBadGameplayDetection(mission.index())) {
 			MineFluenceDisplay.sendChat(source, "Bad mission detection is not implemented yet. Use /minefluence mission complete_debug for now.");
 		}
 		MineFluenceDisplay.sendActionBar(player, "Mission " + mission.index() + ": " + mission.title());
@@ -983,6 +1090,7 @@ public final class MineFluenceCommands {
 
 		MineFluenceDisplay.sendChat(source, "Demo helper started mission " + mission.index() + " " + mission.route() + ".");
 		showMission(source, player, mission);
+		MineFluenceMissionSupplies.grantForMissionStart(player, updatedData, mission);
 		MineFluenceDisplay.sendStatusActionBar(player, updatedData);
 		MineFluenceAreaGuideManager.sendMissionAreaHint(player, mission.index(), mission.route());
 		return updatedData;
@@ -1008,27 +1116,16 @@ public final class MineFluenceCommands {
 	}
 
 	private static int loadDemoMapPreset(ServerCommandSource source, MineFluenceWorldState state, boolean overwriteExisting) {
-		Map<MineFluenceAreaType, MineFluenceArea> presetAreas = MineFluenceDemoMapPreset.areas();
-		int loaded = 0;
-		for (MineFluenceAreaType type : REQUIRED_DEMO_AREAS) {
-			if (!overwriteExisting && state.getArea(type) != null) {
-				continue;
-			}
-
-			MineFluenceArea area = presetAreas.get(type);
-			if (area != null) {
-				state.setArea(area);
-				loaded++;
-			}
-		}
+		int loaded = MineFluenceDemoMapPreset.loadInto(state, overwriteExisting);
 
 		if (loaded <= 0) {
 			return 0;
 		}
 
+		String areaNames = MineFluenceDemoMapPreset.areaNameList();
 		MineFluenceDisplay.sendChat(source, overwriteExisting
-				? "Loaded demo map area preset. Existing preset areas were overwritten."
-				: "Loaded demo map area preset.");
+				? "Loaded new map area preset: " + areaNames + ". Existing definitions were overwritten."
+				: "Loaded missing area preset definitions: " + areaNames + ".");
 		return loaded;
 	}
 
@@ -1150,9 +1247,11 @@ public final class MineFluenceCommands {
 				+ ", Current Weapon Tier=" + MineFluenceWeaponManager.determineTier(data.getFollower())
 				+ ", Ending Triggered=" + data.isEndingTriggered()
 				+ ", Ending Id=" + data.getEndingId()
+				+ ", Exposure Triggered=" + data.isExposureTriggered()
 				+ ", Calculated Follower Ending Tier=" + MineFluenceEndingManager.calculateFollowerTier(data.getFollower())
 				+ ", Calculated Social Ending Tier=" + MineFluenceEndingManager.calculateSocialTier(data.getSocialCredibility())
-				+ ", Lie Value(debug hidden stat)=" + data.getLieValue();
+				+ ", Lie Value(debug hidden stat)=" + data.getLieValue()
+				+ ", Lie Risk=" + MineFluenceBalance.getLieRiskLabel(data.getLieValue());
 	}
 
 	private static MineFluenceEndingTier parseEndingTier(ServerCommandSource source, String value, String label) {

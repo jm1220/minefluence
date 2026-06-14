@@ -10,41 +10,51 @@ The home screen shows an on-demand server snapshot:
 
 - Job
 - Followers
-- Social Credibility
-- Lie Gauge percentage
-- Mission count
+- Social Credibility with signed formatting
+- Lie Risk level instead of exact Lie Value
 - Weapon tier
+- Completed mission count
 - Active mission, pending route choice, pending upload, invasion, or ending state
 - Next recommended action
 
 The client only displays the snapshot. Gameplay state changes still happen on the server.
 
+Lie Risk labels:
+
+- `Stable`: 0 to 29
+- `Suspicious`: 30 to 59
+- `Dangerous`: 60 to 89
+- `Critical`: 90 to 99
+- `Exposed`: 100+
+
+The exact Lie Value is intentionally hidden from normal gameplay HUDs. It remains available through debug/status commands that are explicitly meant for testing.
+
+## Detailed Task Area
+
+The smartphone is the detailed status/control screen. Depending on server state, the current task section shows:
+
+- Pending mission selection: `Mission Choice: N/7` and `Choose Good or Bad.`
+- Active mission: mission index, Good/Bad route, title, objective, progress, and required area when applicable.
+- Pending posting: `Ready to Upload`, mission index/route, and content title.
+- Active invasion: invasion index and invaders remaining.
+- Ending reached: ending display name.
+
+The `Next:` line gives a concise recommended action, such as playing the first tutorial, starting the next mission, opening the Mission Board, completing the objective, opening the Upload Screen, defending the village, or playing/restarting after an ending.
+
 ## Buttons
 
-The visible buttons depend on the current state:
+The visible buttons depend on the current state. First-time players receive `Tutorial`; completing it starts the demo and selects Farmer. Later states expose one primary action such as `Start Next Mission`, `Open Mission Board`, conditional `Show Mission Area`, or `Open Upload Screen`.
 
-- `Start Demo` maps to `/minefluence start` behavior without automatically opening tutorial.
-- `Tutorial` opens the existing tutorial screen.
-- `Choose Farmer` maps to `/minefluence choose farmer`.
-- `Start Next Mission` maps to `/minefluence mission next`.
-- `Open Mission Board` opens the existing mission selection screen.
-- `Choose Good` maps to `/minefluence mission choose good`.
-- `Choose Bad` maps to `/minefluence mission choose bad`.
-- `Open Upload Screen` opens the existing posting/upload screen.
-- `Post Normally` maps to `/minefluence post normal`.
-- `Post Exaggerated` maps to `/minefluence post exaggerate`.
-- `Show Mission Area` maps to the existing mission area particle guide.
-- `Play Ending Video` maps to `/minefluence ending video_test the_famous_villain` behavior when the triggered ending is The Famous Villain.
-- `Restart Demo` maps to the same server start-demo reset used by the phone.
+`Help` replaces the repeated Tutorial button after startup. Ending states expose only supported video playback, restart, Help, and Close.
 
 ## Existing Screens
 
 The home screen does not replace the detailed screens:
 
-- The mission board still provides the Good/Bad mission card UI.
-- The upload screen still provides the normal/exaggerated posting comparison UI.
-- The tutorial screen is unchanged.
-- The `M` key mission board behavior is unchanged.
+- The mission board is the only smartphone UI that provides Good/Bad selection.
+- The upload screen is the only smartphone UI that provides normal/exaggerated posting selection.
+- Help can replay the tutorial without changing server progression.
+- The `M` key mission-board shortcut has been removed.
 
 ## Current Limitations
 
@@ -52,3 +62,4 @@ The home screen does not replace the detailed screens:
 - The phone does not render MP4 inside Minecraft; ending video playback remains external OS playback.
 - The phone cannot complete mission objectives directly. Area missions still require the player to perform the existing gameplay actions.
 - Bad mission detection remains whatever the existing mission system supports.
+- The phone shows rough Lie Risk only, not exact Lie Value.

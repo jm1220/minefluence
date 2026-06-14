@@ -23,10 +23,22 @@ public class MineFluenceTutorialScreen extends Screen {
 	private static final double BUTTON_BOTTOM_RATIO = 0.92D;
 	private static final int BLACK = 0xFF000000;
 
+	private final Screen returnScreen;
+	private final boolean notifyServerOnCompletion;
 	private int pageIndex;
 
 	public MineFluenceTutorialScreen() {
+		this(null, true);
+	}
+
+	private MineFluenceTutorialScreen(Screen returnScreen, boolean notifyServerOnCompletion) {
 		super(Text.literal("MineFluence Tutorial"));
+		this.returnScreen = returnScreen;
+		this.notifyServerOnCompletion = notifyServerOnCompletion;
+	}
+
+	public static MineFluenceTutorialScreen replay(Screen returnScreen) {
+		return new MineFluenceTutorialScreen(returnScreen, false);
 	}
 
 	@Override
@@ -58,6 +70,15 @@ public class MineFluenceTutorialScreen extends Screen {
 		return false;
 	}
 
+	@Override
+	public void close() {
+		if (returnScreen != null && client != null) {
+			client.setScreen(returnScreen);
+			return;
+		}
+		super.close();
+	}
+
 	private void drawCurrentPage(DrawContext context) {
 		int drawWidth = width;
 		int drawHeight = Math.round(width / IMAGE_ASPECT_RATIO);
@@ -85,7 +106,9 @@ public class MineFluenceTutorialScreen extends Screen {
 			return;
 		}
 
-		MineFluenceClientNetworking.finishTutorial();
+		if (notifyServerOnCompletion) {
+			MineFluenceClientNetworking.finishTutorial();
+		}
 		close();
 	}
 }

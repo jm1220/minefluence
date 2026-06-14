@@ -34,8 +34,12 @@ public final class MineFluencePlayerData {
 	private static final String CURRENT_WEAPON_TIER_KEY = "currentWeaponTier";
 	private static final String ACTIVE_MISSION_PROGRESS_KEY = "activeMissionProgress";
 	private static final String MISSION_BASELINE_VALUE_KEY = "missionBaselineValue";
+	private static final String SUPPLIES_GRANTED_MISSION_INDEX_KEY = "suppliesGrantedMissionIndex";
+	private static final String SUPPLIES_GRANTED_ROUTE_KEY = "suppliesGrantedRoute";
 	private static final String ENDING_TRIGGERED_KEY = "endingTriggered";
 	private static final String ENDING_ID_KEY = "endingId";
+	private static final String EXPOSURE_TRIGGERED_KEY = "exposureTriggered";
+	private static final String DEMO_STARTED_KEY = "demoStarted";
 
 	private int follower = MineFluenceBalance.FOLLOWER_DEFAULT;
 	private int socialCredibility = MineFluenceBalance.SOCIAL_CREDIBILITY_DEFAULT;
@@ -55,8 +59,12 @@ public final class MineFluencePlayerData {
 	private MineFluenceWeaponTier currentWeaponTier = MineFluenceWeaponTier.WOOD;
 	private int activeMissionProgress;
 	private int missionBaselineValue;
+	private int suppliesGrantedMissionIndex;
+	private MineFluenceMissionRoute suppliesGrantedRoute = MineFluenceMissionRoute.NONE;
 	private boolean endingTriggered;
 	private String endingId = "";
+	private boolean exposureTriggered;
+	private boolean demoStarted;
 
 	public static MineFluencePlayerData fromNbt(NbtCompound nbt) {
 		MineFluencePlayerData data = new MineFluencePlayerData();
@@ -124,11 +132,25 @@ public final class MineFluencePlayerData {
 		if (nbt.contains(MISSION_BASELINE_VALUE_KEY, NbtElement.INT_TYPE)) {
 			data.setMissionBaselineValue(nbt.getInt(MISSION_BASELINE_VALUE_KEY));
 		}
+		if (nbt.contains(SUPPLIES_GRANTED_MISSION_INDEX_KEY, NbtElement.INT_TYPE)) {
+			data.setSuppliesGrantedMissionIndex(nbt.getInt(SUPPLIES_GRANTED_MISSION_INDEX_KEY));
+		}
+		if (nbt.contains(SUPPLIES_GRANTED_ROUTE_KEY, NbtElement.STRING_TYPE)) {
+			data.setSuppliesGrantedRoute(MineFluenceMissionRoute.fromSerializedName(nbt.getString(SUPPLIES_GRANTED_ROUTE_KEY)));
+		}
 		if (nbt.contains(ENDING_TRIGGERED_KEY, NbtElement.BYTE_TYPE)) {
 			data.setEndingTriggered(nbt.getBoolean(ENDING_TRIGGERED_KEY));
 		}
 		if (nbt.contains(ENDING_ID_KEY, NbtElement.STRING_TYPE)) {
 			data.setEndingId(nbt.getString(ENDING_ID_KEY));
+		}
+		if (nbt.contains(EXPOSURE_TRIGGERED_KEY, NbtElement.BYTE_TYPE)) {
+			data.setExposureTriggered(nbt.getBoolean(EXPOSURE_TRIGGERED_KEY));
+		}
+		if (nbt.contains(DEMO_STARTED_KEY, NbtElement.BYTE_TYPE)) {
+			data.setDemoStarted(nbt.getBoolean(DEMO_STARTED_KEY));
+		} else {
+			data.setDemoStarted(data.hasLegacyDemoProgress());
 		}
 		data.normalizeMissionRoutesAfterLoad();
 
@@ -160,8 +182,12 @@ public final class MineFluencePlayerData {
 		nbt.putString(CURRENT_WEAPON_TIER_KEY, currentWeaponTier.serializedName());
 		nbt.putInt(ACTIVE_MISSION_PROGRESS_KEY, activeMissionProgress);
 		nbt.putInt(MISSION_BASELINE_VALUE_KEY, missionBaselineValue);
+		nbt.putInt(SUPPLIES_GRANTED_MISSION_INDEX_KEY, suppliesGrantedMissionIndex);
+		nbt.putString(SUPPLIES_GRANTED_ROUTE_KEY, suppliesGrantedRoute.serializedName());
 		nbt.putBoolean(ENDING_TRIGGERED_KEY, endingTriggered);
 		nbt.putString(ENDING_ID_KEY, endingId);
+		nbt.putBoolean(EXPOSURE_TRIGGERED_KEY, exposureTriggered);
+		nbt.putBoolean(DEMO_STARTED_KEY, demoStarted);
 		return nbt;
 	}
 
@@ -176,6 +202,7 @@ public final class MineFluencePlayerData {
 		clearInvasionState();
 		setCurrentWeaponTier(MineFluenceWeaponTier.WOOD);
 		clearEndingState();
+		setDemoStarted(true);
 	}
 
 	public int getFollower() {
@@ -232,6 +259,9 @@ public final class MineFluencePlayerData {
 
 	public void setSelectedJob(MineFluenceJob selectedJob) {
 		this.selectedJob = selectedJob == null ? MineFluenceJob.NONE : selectedJob;
+		if (this.selectedJob != MineFluenceJob.NONE) {
+			setDemoStarted(true);
+		}
 	}
 
 	public int getLastCompletedInvasionIndex() {
@@ -298,6 +328,7 @@ public final class MineFluencePlayerData {
 		setPendingPostingMissionRoute(MineFluenceMissionRoute.NONE);
 		setActiveMissionProgress(0);
 		setMissionBaselineValue(0);
+		clearMissionSuppliesGrant();
 	}
 
 	public void markActiveMissionReadyToPost() {
@@ -315,6 +346,7 @@ public final class MineFluencePlayerData {
 		setPendingPostingMissionRoute(MineFluenceMissionRoute.NONE);
 		setActiveMissionProgress(0);
 		setMissionBaselineValue(0);
+		clearMissionSuppliesGrant();
 	}
 
 	public MineFluenceMissionRoute getPendingPostingMissionRoute() {
@@ -408,6 +440,37 @@ public final class MineFluencePlayerData {
 		this.missionBaselineValue = Math.max(0, missionBaselineValue);
 	}
 
+	public int getSuppliesGrantedMissionIndex() {
+		return suppliesGrantedMissionIndex;
+	}
+
+	public void setSuppliesGrantedMissionIndex(int suppliesGrantedMissionIndex) {
+		this.suppliesGrantedMissionIndex = MineFluenceBalance.clampMissionIndex(suppliesGrantedMissionIndex);
+	}
+
+	public MineFluenceMissionRoute getSuppliesGrantedRoute() {
+		return suppliesGrantedRoute;
+	}
+
+	public void setSuppliesGrantedRoute(MineFluenceMissionRoute suppliesGrantedRoute) {
+		this.suppliesGrantedRoute = suppliesGrantedRoute == null ? MineFluenceMissionRoute.NONE : suppliesGrantedRoute;
+	}
+
+	public boolean hasMissionSuppliesGranted(int missionIndex, MineFluenceMissionRoute route) {
+		MineFluenceMissionRoute resolvedRoute = route == MineFluenceMissionRoute.NONE ? MineFluenceMissionRoute.GOOD : route;
+		return suppliesGrantedMissionIndex == missionIndex && suppliesGrantedRoute == resolvedRoute;
+	}
+
+	public void markMissionSuppliesGranted(int missionIndex, MineFluenceMissionRoute route) {
+		setSuppliesGrantedMissionIndex(missionIndex);
+		setSuppliesGrantedRoute(route == MineFluenceMissionRoute.NONE ? MineFluenceMissionRoute.GOOD : route);
+	}
+
+	public void clearMissionSuppliesGrant() {
+		setSuppliesGrantedMissionIndex(0);
+		setSuppliesGrantedRoute(MineFluenceMissionRoute.NONE);
+	}
+
 	public boolean isEndingTriggered() {
 		return endingTriggered;
 	}
@@ -427,6 +490,38 @@ public final class MineFluencePlayerData {
 	public void clearEndingState() {
 		setEndingTriggered(false);
 		setEndingId("");
+		setExposureTriggered(false);
+	}
+
+	public boolean isExposureTriggered() {
+		return exposureTriggered;
+	}
+
+	public void setExposureTriggered(boolean exposureTriggered) {
+		this.exposureTriggered = exposureTriggered;
+	}
+
+	public boolean isDemoStarted() {
+		return demoStarted;
+	}
+
+	public void setDemoStarted(boolean demoStarted) {
+		this.demoStarted = demoStarted;
+	}
+
+	private boolean hasLegacyDemoProgress() {
+		return selectedJob != MineFluenceJob.NONE
+				|| follower != MineFluenceBalance.FOLLOWER_DEFAULT
+				|| socialCredibility != MineFluenceBalance.SOCIAL_CREDIBILITY_DEFAULT
+				|| lieValue != MineFluenceBalance.LIE_VALUE_DEFAULT
+				|| completedMissionCount != MineFluenceBalance.COMPLETED_MISSION_DEFAULT
+				|| lastCompletedInvasionIndex != MineFluenceBalance.LAST_COMPLETED_INVASION_DEFAULT
+				|| hasPendingMissionSelection()
+				|| hasActiveMission()
+				|| isWaitingForPostingChoice()
+				|| hasActiveInvasion()
+				|| endingTriggered
+				|| exposureTriggered;
 	}
 
 	private void normalizeMissionRoutesAfterLoad() {
@@ -435,6 +530,9 @@ public final class MineFluencePlayerData {
 		}
 		if (isWaitingForPostingChoice() && pendingPostingMissionRoute == MineFluenceMissionRoute.NONE) {
 			setPendingPostingMissionRoute(MineFluenceMissionRoute.GOOD);
+		}
+		if (suppliesGrantedMissionIndex > 0 && suppliesGrantedRoute == MineFluenceMissionRoute.NONE) {
+			setSuppliesGrantedRoute(MineFluenceMissionRoute.GOOD);
 		}
 	}
 }

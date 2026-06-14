@@ -41,6 +41,9 @@ public class MineFluencePostingScreen extends Screen {
 				.dimensions(centerX + 85, buttonY, 70, 20)
 				.build();
 
+		boolean canPost = MineFluencePhoneStateResponsePayload.STATE_READY_TO_UPLOAD.equals(state.state());
+		normalButton.active = canPost;
+		exaggeratedButton.active = canPost;
 		addDrawableChild(normalButton);
 		addDrawableChild(exaggeratedButton);
 		addDrawableChild(closeButton);
@@ -121,7 +124,7 @@ public class MineFluencePostingScreen extends Screen {
 		context.drawTextWithShadow(textRenderer, label, x + 8, y + 8, borderColor);
 		context.drawTextWithShadow(textRenderer, "Follower " + signed(follower), x + 8, y + 26, TEXT_COLOR);
 		context.drawTextWithShadow(textRenderer, "Social " + signed(social), x + 8, y + 40, TEXT_COLOR);
-		context.drawTextWithShadow(textRenderer, "Lie Value " + signed(lie), x + 8, y + 54, MUTED_TEXT_COLOR);
+		context.drawTextWithShadow(textRenderer, "Lie Risk: " + lieRiskPreview(lie), x + 8, y + 54, MUTED_TEXT_COLOR);
 	}
 
 	private void drawCenteredMessage(DrawContext context, String message, int y) {
@@ -138,5 +141,12 @@ public class MineFluencePostingScreen extends Screen {
 			return "+" + value;
 		}
 		return Integer.toString(value);
+	}
+
+	private static String lieRiskPreview(int lieIncrease) {
+		if (lieIncrease <= 0) {
+			return "None";
+		}
+		return "Hidden increase";
 	}
 }

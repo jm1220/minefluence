@@ -1,12 +1,9 @@
 package net.jeongmin.modid;
 
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.jeongmin.modid.billboard.MineFluenceBillboardClient;
-import net.jeongmin.modid.client.MineFluenceMissionScreen;
 import net.jeongmin.modid.client.MineFluenceHudOverlay;
 import net.jeongmin.modid.client.MineFluencePhoneInfoScreen;
 import net.jeongmin.modid.entity.DdjRenderer;
@@ -14,18 +11,10 @@ import net.jeongmin.modid.entity.MineFluenceEntities;
 import net.jeongmin.modid.item.MineFluenceItems;
 import net.jeongmin.modid.network.MineFluenceClientNetworking;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.TypedActionResult;
-import org.lwjgl.glfw.GLFW;
 
 public class MineFluenceClient implements ClientModInitializer {
-	private static final String MISSION_KEY_TRANSLATION = "key.minefluence.open_mission_tab";
-	private static final String MISSION_KEY_CATEGORY = "category.minefluence";
-
-	private KeyBinding openMissionTabKey;
-
 	@Override
 	public void onInitializeClient() {
 		EntityRendererRegistry.register(MineFluenceEntities.DDJ, DdjRenderer::new);
@@ -33,18 +22,6 @@ public class MineFluenceClient implements ClientModInitializer {
 		MineFluenceClientNetworking.register();
 		MineFluenceHudOverlay.register();
 		registerSmartphoneUse();
-		openMissionTabKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-				MISSION_KEY_TRANSLATION,
-				InputUtil.Type.KEYSYM,
-				GLFW.GLFW_KEY_M,
-				MISSION_KEY_CATEGORY
-		));
-
-		ClientTickEvents.END_CLIENT_TICK.register(client -> {
-			while (openMissionTabKey.wasPressed()) {
-				openMissionScreen(client);
-			}
-		});
 	}
 
 	private static void registerSmartphoneUse() {
@@ -71,9 +48,4 @@ public class MineFluenceClient implements ClientModInitializer {
 		}
 	}
 
-	private static void openMissionScreen(MinecraftClient client) {
-		if (client.currentScreen == null) {
-			client.setScreen(new MineFluenceMissionScreen());
-		}
-	}
 }

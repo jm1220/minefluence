@@ -52,11 +52,13 @@ Player commands:
 - `/minefluence tutorial`
 - `/minefluence tutorial open`
 
-`/minefluence start` still performs the existing demo reset/start behavior, then opens the tutorial screen if the client supports the MineFluence tutorial packet.
+The not-started smartphone screen opens the tutorial as the player-facing start path. `/minefluence start` still performs the existing command-based demo reset/start behavior.
 
 ## Play Behavior
 
-On the final page, Play sends `MineFluenceTutorialPlayPayload` to the server. The server calls the same shared Farmer selection flow used by `/minefluence choose farmer`, so the server remains authoritative and the client does not mutate game state directly.
+On the final page of the first-time tutorial, Play sends `MineFluenceTutorialPlayPayload` to the server. If the demo has not started, the server calls the existing demo-start service and then the shared Farmer-selection flow. The client does not mutate player data directly.
+
+Help uses a separate replay mode. Replay does not send the completion payload and returns to Help, so it cannot reset the demo or alter current progress.
 
 ## Limitations
 

@@ -1,12 +1,8 @@
 # MineFluence Mission GUI
 
-## Keybind
+## Opening
 
-- Name: Open Mission Tab
-- Category: MineFluence
-- Default key: M
-
-Pressing the key opens the MineFluence Mission Board client screen. The MineFluence Smartphone can open the same screen when a pending mission choice exists.
+The Mission Board opens from the smartphone only while a Good/Bad route choice is pending. The old `M` keybind registration has been removed.
 
 ## Purpose
 
@@ -32,7 +28,7 @@ The icon assets are loaded from:
 
 ## Server Authority
 
-The client screen requests mission-board data from the server and displays the same Farmer mission definitions used by commands. Clicking Good or Bad sends only the selected route to the server. The server validates selected job, mission state, pending posting state, mission count, and required Good mission areas before starting the mission.
+The client screen requests mission-board data from the server and displays the same Farmer mission definitions used by commands. Clicking Good or Bad sends only the selected route to the server. The server requires a pending mission choice and validates selected job, invasion/ending state, mission state, pending posting state, mission count, and required mission areas before starting the mission.
 
 The card buttons still call the existing client networking method, which sends the same mission-choice payload used by the earlier screen implementation.
 

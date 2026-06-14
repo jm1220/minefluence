@@ -4,6 +4,7 @@ import java.util.Locale;
 
 public enum MineFluencePhoneAction {
 	START_DEMO,
+	OPEN_TUTORIAL,
 	CHOOSE_FARMER,
 	START_NEXT_MISSION,
 	CHOOSE_GOOD,
@@ -11,7 +12,9 @@ public enum MineFluencePhoneAction {
 	POST_NORMAL,
 	POST_EXAGGERATE,
 	SHOW_MISSION_AREA,
-	PLAY_ENDING_VIDEO;
+	SHOW_INVASION_STATUS,
+	PLAY_ENDING_VIDEO,
+	RESTART_DEMO;
 
 	public String serializedName() {
 		return name().toLowerCase(Locale.ROOT);

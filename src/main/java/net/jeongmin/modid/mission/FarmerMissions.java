@@ -104,7 +104,7 @@ public final class FarmerMissions {
 					MineFluenceMissionRoute.BAD,
 					"Trample the Farm",
 					"Turn village damage into provocative content.",
-					"Trample or destroy 5 farmland blocks.",
+					"Trample or destroy 5 farmland blocks in the configured farm area.",
 					MineFluenceBalance.FARMER_BAD_MISSION_2_TARGET,
 					MineFluenceBalance.FARMER_BAD_MISSION_2_FOLLOWER_REWARD,
 					MineFluenceBalance.FARMER_BAD_MISSION_2_SOCIAL_REWARD
@@ -126,7 +126,7 @@ public final class FarmerMissions {
 					MineFluenceMissionRoute.BAD,
 					"Steal from Villagers",
 					"Take supplies and turn the theft into a viral post.",
-					"Steal 10 items from a villager chest.",
+					"Steal 10 items from a chest in the configured shared area.",
 					MineFluenceBalance.FARMER_BAD_MISSION_4_TARGET,
 					MineFluenceBalance.FARMER_BAD_MISSION_4_FOLLOWER_REWARD,
 					MineFluenceBalance.FARMER_BAD_MISSION_4_SOCIAL_REWARD
@@ -148,7 +148,7 @@ public final class FarmerMissions {
 					MineFluenceMissionRoute.BAD,
 					"Destroy a Farm Plot",
 					"Ruin a villager farm plot and post the spectacle.",
-					"Destroy one villager farm plot.",
+					"Destroy one farm plot block in the configured farm area.",
 					MineFluenceBalance.FARMER_BAD_MISSION_6_TARGET,
 					MineFluenceBalance.FARMER_BAD_MISSION_6_FOLLOWER_REWARD,
 					MineFluenceBalance.FARMER_BAD_MISSION_6_SOCIAL_REWARD

@@ -7,7 +7,7 @@
 - `src/main/resources/assets/minefluence/textures/gui/hud/invasion_icon.png`
 - `src/main/resources/assets/minefluence/textures/gui/hud/lie_icon.png`
 
-`good_icon.png` is used for Good missions and Social Credibility. `bad_icon.png` is used for Bad missions and as the current Followers placeholder. `invasion_icon.png` is used for invasion objectives. `lie_icon.png` is used for Lie Gauge.
+`good_icon.png` is used for Good missions. `bad_icon.png` is used for Bad missions. `invasion_icon.png` is used for invasion objectives. `lie_icon.png` remains available for debug/future UI but is not used by the normal gameplay HUD.
 
 ## Objective Card
 
@@ -27,32 +27,45 @@ When a mission is active and no invasion is active, the card shows:
 
 If no mission or invasion is active, the objective card is not rendered.
 
-## Stat Panel
+## Compact Public Stats
 
-The right-side stat panel shows:
+The old right-side stat panel is disabled by default with `SHOW_RIGHT_STAT_PANEL = false` in `MineFluenceHudOverlay`.
 
-- Followers
-- Social Credibility
-- Lie Gauge
+The normal gameplay HUD now renders a compact horizontal icon-and-value row above the vanilla hotbar:
 
-Lie Gauge is calculated from the synced server value:
+- Followers uses `textures/gui/hud/bad_icon.png`, matching the old right-side status panel.
+- Trust/Social Credibility uses `textures/gui/hud/good_icon.png`, matching the old right-side status panel.
+
+Example:
 
 ```text
-liePercent = lieValue * 100 / MineFluenceBalance.LIE_VALUE_MAX
+[follower icon] 60     [trust icon] +300
 ```
 
-The client constant `SHOW_LIE_GAUGE` in `MineFluenceHudOverlay` can hide this row later without changing gameplay state.
+The row is centered with `screenWidth / 2` style positioning and normally drawn around `screenHeight - 65`, above the hotbar/health area. While the mission locator is visible, it moves to `screenHeight - 78` so the two overlays do not overlap. Only numeric values are drawn; the old bracketed Followers/Trust labels are removed. Social Credibility uses signed formatting: positive values show `+`, zero shows `0`, and negatives keep `-`.
+
+Exact Lie Value and Lie Gauge are not shown in the normal gameplay HUD. Debug commands may still expose exact values for demo/testing.
+
+## Scoreboard Sidebar
+
+The old MineFluence scoreboard sidebar is disabled by default with `SHOW_SCOREBOARD_SIDEBAR = false` in `MineFluenceHud`. `MineFluenceHud.refresh` still sends the client HUD snapshot immediately, but clears the old `mf_hud` sidebar if it is present.
 
 ## Sync
 
-The server remains authoritative. `MineFluenceHud.refresh` still updates the existing scoreboard HUD and now also sends `MineFluenceHudStatePayload` to the player. A periodic server tick sync sends the same snapshot once per second so passive mission/invasion progress stays current.
+The server remains authoritative. `MineFluenceHud.refresh` sends `MineFluenceHudStatePayload` to the player. A periodic server tick sync sends the same snapshot once per second so passive mission/invasion progress stays current.
 
-The snapshot contains stats, mission display details, pending posting metadata, invasion index/progress, and ending display text. The client stores the latest snapshot in `MineFluenceHudState` and renders it in `MineFluenceHudOverlay`.
+The snapshot contains stats, mission display details, active mission area bounds, pending posting metadata, invasion index/progress, and ending display text. The client stores the latest snapshot in `MineFluenceHudState` and renders it in `MineFluenceHudOverlay`.
 
 `/minefluence hud refresh` manually sends the current snapshot to the command user.
 
+## Mission Locator
+
+Area-based active missions also render a small custom locator near the vanilla XP bar. It is a MineFluence client overlay for Minecraft 1.21.1 and does not replace or mutate Minecraft experience. See `docs/mission_locator_bar.md` for the visibility rules and direction calculation.
+
+The locator is label-free. Mission progress is displayed by the top-right objective card, so per-progress action-bar text and the bottom `Mission Area`/`Mission Area Nearby` labels are not rendered.
+
 ## Limitations
 
-- The Followers row currently uses `bad_icon.png` as a placeholder because no dedicated follower icon was provided.
-- The existing scoreboard sidebar remains enabled for now.
+- The compact HUD does not show exact Lie Value by design.
+- The old right-side stat panel and scoreboard sidebar are disabled but still have guarded code paths for debugging/future UI work.
 - The HUD is display-only; it does not accept input and does not mutate gameplay state.

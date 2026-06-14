@@ -4,6 +4,9 @@ import java.util.List;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.jeongmin.modid.area.MineFluenceArea;
+import net.jeongmin.modid.area.MineFluenceAreaType;
+import net.jeongmin.modid.area.MineFluenceMissionAreas;
 import net.jeongmin.modid.config.MineFluenceBalance;
 import net.jeongmin.modid.data.MineFluencePlayerData;
 import net.jeongmin.modid.data.MineFluenceWorldState;
@@ -26,6 +29,7 @@ import net.minecraft.text.Text;
 
 public final class MineFluenceHud {
 	private static final String OBJECTIVE_NAME = "mf_hud";
+	private static final boolean SHOW_SCOREBOARD_SIDEBAR = false;
 	private static final int HUD_SYNC_TICK_INTERVAL = 20;
 	private static final List<String> LINE_KEYS = List.of(
 			"mf_hud_line_1",
@@ -45,6 +49,12 @@ public final class MineFluenceHud {
 	}
 
 	public static void refresh(ServerPlayerEntity player, MineFluencePlayerData data) {
+		if (!SHOW_SCOREBOARD_SIDEBAR) {
+			clearScoreboardSidebar(player);
+			syncCustomHud(player, data);
+			return;
+		}
+
 		Scoreboard scoreboard = player.getServer().getScoreboard();
 		ScoreboardObjective objective = getOrCreateObjective(scoreboard);
 		if (scoreboard.getObjectiveForSlot(ScoreboardDisplaySlot.SIDEBAR) != objective) {
@@ -70,6 +80,19 @@ public final class MineFluenceHud {
 		}
 
 		syncCustomHud(player, data);
+	}
+
+	private static void clearScoreboardSidebar(ServerPlayerEntity player) {
+		Scoreboard scoreboard = player.getServer().getScoreboard();
+		ScoreboardObjective objective = scoreboard.getNullableObjective(OBJECTIVE_NAME);
+		if (objective == null) {
+			return;
+		}
+
+		if (scoreboard.getObjectiveForSlot(ScoreboardDisplaySlot.SIDEBAR) == objective) {
+			scoreboard.setObjectiveSlot(ScoreboardDisplaySlot.SIDEBAR, null);
+		}
+		scoreboard.removeObjective(objective);
 	}
 
 	private static void syncAllCustomHudStates(MinecraftServer server) {
@@ -110,6 +133,9 @@ public final class MineFluenceHud {
 			missionObjective = activeMission.objectiveText();
 		}
 
+		MineFluenceArea missionArea = activeMissionArea(player, data, missionProgress, missionTarget);
+		boolean hasMissionArea = missionArea != null;
+
 		int invasionRemaining = 0;
 		int invasionTotal = 0;
 		if (data.hasActiveInvasion()) {
@@ -129,6 +155,15 @@ public final class MineFluenceHud {
 				missionObjective,
 				missionProgress,
 				missionTarget,
+				hasMissionArea,
+				hasMissionArea ? missionArea.type().commandName() : "",
+				hasMissionArea ? missionArea.dimensionId() : "",
+				hasMissionArea ? missionArea.min().getX() : 0,
+				hasMissionArea ? missionArea.min().getY() : 0,
+				hasMissionArea ? missionArea.min().getZ() : 0,
+				hasMissionArea ? missionArea.max().getX() : 0,
+				hasMissionArea ? missionArea.max().getY() : 0,
+				hasMissionArea ? missionArea.max().getZ() : 0,
 				data.isWaitingForPostingChoice(),
 				data.getPendingPostingMissionIndex(),
 				data.getPendingPostingMissionRoute().serializedName(),
@@ -137,6 +172,32 @@ public final class MineFluenceHud {
 				invasionTotal,
 				data.isEndingTriggered() ? MineFluenceEndingManager.endingDisplayName(data) : ""
 		);
+	}
+
+	private static MineFluenceArea activeMissionArea(
+			ServerPlayerEntity player,
+			MineFluencePlayerData data,
+			int missionProgress,
+			int missionTarget
+	) {
+		if (!data.isDemoStarted()
+				|| !data.hasActiveMission()
+				|| data.isWaitingForPostingChoice()
+				|| data.hasActiveInvasion()
+				|| data.isEndingTriggered()
+				|| missionTarget <= 0
+				|| missionProgress >= missionTarget) {
+			return null;
+		}
+
+		MineFluenceAreaType areaType = MineFluenceMissionAreas.getAreaForMission(
+				data.getActiveMissionRoute(),
+				data.getActiveMissionIndex()
+		);
+		if (areaType == null) {
+			return null;
+		}
+		return MineFluenceWorldState.get(player.getServer()).getArea(areaType);
 	}
 
 	private static ScoreboardObjective getOrCreateObjective(Scoreboard scoreboard) {

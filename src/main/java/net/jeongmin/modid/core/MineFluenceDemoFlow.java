@@ -1,12 +1,9 @@
 package net.jeongmin.modid.core;
 
-import java.util.Map;
-
-import net.jeongmin.modid.area.MineFluenceArea;
-import net.jeongmin.modid.area.MineFluenceAreaType;
 import net.jeongmin.modid.area.MineFluenceDemoMapPreset;
 import net.jeongmin.modid.data.MineFluencePlayerData;
 import net.jeongmin.modid.data.MineFluenceWorldState;
+import net.jeongmin.modid.fan.MineFluenceFanVillagers;
 import net.jeongmin.modid.invasion.MineFluenceInvasionManager;
 import net.jeongmin.modid.item.MineFluenceItems;
 import net.jeongmin.modid.network.MineFluenceNetworking;
@@ -16,13 +13,6 @@ import net.jeongmin.modid.weapon.MineFluenceWeaponManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 
 public final class MineFluenceDemoFlow {
-	private static final MineFluenceAreaType[] REQUIRED_DEMO_AREAS = {
-			MineFluenceAreaType.GARDEN,
-			MineFluenceAreaType.FARM,
-			MineFluenceAreaType.SHARED_SPACE,
-			MineFluenceAreaType.FARM_BUILD_AREA
-	};
-
 	private MineFluenceDemoFlow() {
 	}
 
@@ -30,10 +20,12 @@ public final class MineFluenceDemoFlow {
 		MineFluenceWorldState state = MineFluenceWorldState.get(player.getServer());
 		MineFluencePlayerData currentData = state.getPlayerData(player);
 		MineFluenceInvasionManager.clearInvasionForReset(player, currentData);
+		MineFluenceFanVillagers.clearFanVillagers(player);
 		MineFluencePlayerData data = state.updatePlayerData(player, MineFluencePlayerData::resetForDemoStart);
 		MineFluenceWeaponManager.updateWeapon(player, data);
 		MineFluenceItems.ensureSingleSmartphone(player);
 		loadMissingDemoMapPresetAreas(player);
+		MineFluenceFanVillagers.syncFanVillagers(player);
 
 		MineFluenceDisplay.sendChat(player, "Welcome to MineFluence.");
 		MineFluenceDisplay.sendChat(player, "You are an influencer trying to gain followers and social credibility to defend the village.");
@@ -63,22 +55,10 @@ public final class MineFluenceDemoFlow {
 
 	public static int loadMissingDemoMapPresetAreas(ServerPlayerEntity player) {
 		MineFluenceWorldState state = MineFluenceWorldState.get(player.getServer());
-		Map<MineFluenceAreaType, MineFluenceArea> presetAreas = MineFluenceDemoMapPreset.areas();
-		int loaded = 0;
-		for (MineFluenceAreaType type : REQUIRED_DEMO_AREAS) {
-			if (state.getArea(type) != null) {
-				continue;
-			}
-
-			MineFluenceArea area = presetAreas.get(type);
-			if (area != null) {
-				state.setArea(area);
-				loaded++;
-			}
-		}
+		int loaded = MineFluenceDemoMapPreset.loadInto(state, false);
 
 		if (loaded > 0) {
-			MineFluenceDisplay.sendChat(player, "Loaded demo map area preset.");
+			MineFluenceDisplay.sendChat(player, "Loaded missing area preset definitions: " + MineFluenceDemoMapPreset.areaNameList() + ".");
 		}
 		return loaded;
 	}

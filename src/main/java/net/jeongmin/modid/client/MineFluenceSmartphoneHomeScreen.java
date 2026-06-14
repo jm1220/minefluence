@@ -2,6 +2,7 @@ package net.jeongmin.modid.client;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import net.jeongmin.modid.config.MineFluenceBalance;
 import net.jeongmin.modid.network.MineFluenceClientNetworking;
@@ -20,15 +21,14 @@ public class MineFluenceSmartphoneHomeScreen extends Screen {
 	private static final int WARNING_COLOR = 0xFFFFCC66;
 	private static final int PANEL_BACKGROUND = 0xCC11151B;
 	private static final int PANEL_BORDER = 0x668A929C;
-	private static final int BUTTON_WIDTH = 154;
 	private static final int BUTTON_HEIGHT = 20;
 	private static final int BUTTON_STEP = 23;
-	private static final int WIDE_LAYOUT_WIDTH = 390;
+	private static final int WIDE_LAYOUT_WIDTH = 300;
 
 	private final MineFluencePhoneStateResponsePayload state;
 	private final List<ButtonWidget> buttons = new ArrayList<>();
 	private String localMessage;
-	private int buttonStartY;
+	private PhoneLayout currentLayout;
 
 	public MineFluenceSmartphoneHomeScreen(MineFluencePhoneStateResponsePayload state) {
 		super(Text.literal("MineFluence Smartphone"));
@@ -40,177 +40,232 @@ public class MineFluenceSmartphoneHomeScreen extends Screen {
 	protected void init() {
 		buttons.clear();
 		List<ButtonSpec> specs = buttonSpecs();
-		boolean wide = width >= WIDE_LAYOUT_WIDTH;
-		int buttonWidth = Math.min(BUTTON_WIDTH, Math.max(120, width - 48));
-		int buttonX = wide ? width - buttonWidth - 24 : (width - buttonWidth) / 2;
-		buttonStartY = wide ? 52 : Math.max(96, height - specs.size() * BUTTON_STEP - 24);
+		currentLayout = layout(specs.size());
 
-		int y = buttonStartY;
-		for (ButtonSpec spec : specs) {
+		for (int index = 0; index < specs.size(); index++) {
+			ButtonSpec spec = specs.get(index);
 			ButtonWidget button = ButtonWidget.builder(Text.literal(spec.label()), pressedButton -> spec.action().run())
-					.dimensions(buttonX, y, buttonWidth, BUTTON_HEIGHT)
+					.dimensions(
+							currentLayout.buttonX(),
+							currentLayout.buttonStartY() + index * BUTTON_STEP,
+							currentLayout.buttonWidth(),
+							BUTTON_HEIGHT
+					)
 					.build();
 			buttons.add(button);
 			addDrawableChild(button);
-			y += BUTTON_STEP;
 		}
 	}
 
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		renderBackground(context, mouseX, mouseY, delta);
-		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 16, TEXT_COLOR);
-		drawStatusPanel(context);
+		PhoneLayout layout = currentLayout == null ? layout(buttonSpecs().size()) : currentLayout;
+		drawPanel(context, layout);
+		context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 14, TEXT_COLOR);
+		drawStatusText(context, layout);
 		renderButtons(context, mouseX, mouseY, delta);
 	}
 
 	private List<ButtonSpec> buttonSpecs() {
-		List<ButtonSpec> buttons = new ArrayList<>();
-		if (state.endingTriggered()) {
-			buttons.add(new ButtonSpec("View Ending", this::viewEnding));
-			buttons.add(new ButtonSpec("Play Ending Video", () -> sendAction(MineFluencePhoneAction.PLAY_ENDING_VIDEO)));
-			buttons.add(new ButtonSpec("Restart Demo", () -> sendAction(MineFluencePhoneAction.START_DEMO)));
-			buttons.add(new ButtonSpec("Tutorial", this::openTutorial));
-		} else if (state.activeInvasionIndex() > 0) {
-			buttons.add(new ButtonSpec("Invasion Status", this::viewInvasionStatus));
-			buttons.add(new ButtonSpec("Status Refresh", this::refresh));
-			buttons.add(new ButtonSpec("Tutorial", this::openTutorial));
-		} else if (isPosting()) {
-			buttons.add(new ButtonSpec("Open Upload Screen", this::openUploadScreen));
-			buttons.add(new ButtonSpec("Post Normally", () -> sendAction(MineFluencePhoneAction.POST_NORMAL)));
-			buttons.add(new ButtonSpec("Post Exaggerated", () -> sendAction(MineFluencePhoneAction.POST_EXAGGERATE)));
-		} else if (isPendingMissionSelection()) {
-			buttons.add(new ButtonSpec("Open Mission Board", this::openMissionBoard));
-			buttons.add(new ButtonSpec("Choose Good", () -> sendAction(MineFluencePhoneAction.CHOOSE_GOOD)));
-			buttons.add(new ButtonSpec("Choose Bad", () -> sendAction(MineFluencePhoneAction.CHOOSE_BAD)));
-		} else if (isActiveMission()) {
-			buttons.add(new ButtonSpec("Show Mission Area", () -> sendAction(MineFluencePhoneAction.SHOW_MISSION_AREA)));
-			buttons.add(new ButtonSpec("View Progress", this::viewProgress));
-			buttons.add(new ButtonSpec("Open Mission Board", this::openMissionBoard));
-		} else if (!hasFarmerJob()) {
-			if (isLikelyResetState()) {
-				buttons.add(new ButtonSpec("Start Demo", () -> sendAction(MineFluencePhoneAction.START_DEMO)));
-			} else {
-				buttons.add(new ButtonSpec("Choose Farmer", () -> sendAction(MineFluencePhoneAction.CHOOSE_FARMER)));
-				buttons.add(new ButtonSpec("Start Demo", () -> sendAction(MineFluencePhoneAction.START_DEMO)));
+		List<ButtonSpec> specs = new ArrayList<>();
+		if (isEndingState()) {
+			if (state.endingVideoAvailable()) {
+				specs.add(new ButtonSpec("Play Ending Video", () -> sendAction(MineFluencePhoneAction.PLAY_ENDING_VIDEO)));
 			}
-			buttons.add(new ButtonSpec("Tutorial", this::openTutorial));
-		} else {
-			if (state.completedMissionCount() < MineFluenceBalance.TOTAL_DEMO_MISSIONS) {
-				buttons.add(new ButtonSpec("Start Next Mission", () -> sendAction(MineFluencePhoneAction.START_NEXT_MISSION)));
+			specs.add(new ButtonSpec("Restart Demo", () -> sendAction(MineFluencePhoneAction.RESTART_DEMO)));
+		} else if (isState(MineFluencePhoneStateResponsePayload.STATE_READY_TO_UPLOAD)) {
+			specs.add(new ButtonSpec("Open Upload Screen", this::openUploadScreen));
+		} else if (isState(MineFluencePhoneStateResponsePayload.STATE_MISSION_CHOICE)) {
+			specs.add(new ButtonSpec("Open Mission Board", this::openMissionBoard));
+		} else if (isState(MineFluencePhoneStateResponsePayload.STATE_MISSION_ACTIVE)) {
+			if (!safeText(state.requiredAreaName()).isBlank()) {
+				specs.add(new ButtonSpec("Show Mission Area", () -> sendAction(MineFluencePhoneAction.SHOW_MISSION_AREA)));
 			}
-			buttons.add(new ButtonSpec("Tutorial", this::openTutorial));
-			buttons.add(new ButtonSpec("Status Refresh", this::refresh));
+		} else if (isState(MineFluencePhoneStateResponsePayload.STATE_NOT_STARTED)) {
+			specs.add(new ButtonSpec("Tutorial", () -> sendAction(MineFluencePhoneAction.OPEN_TUTORIAL)));
+		} else if (isState(MineFluencePhoneStateResponsePayload.STATE_CHOOSE_JOB)) {
+			specs.add(new ButtonSpec("Choose Farmer", () -> sendAction(MineFluencePhoneAction.CHOOSE_FARMER)));
+		} else if (state.completedMissionCount() < MineFluenceBalance.TOTAL_DEMO_MISSIONS) {
+			specs.add(new ButtonSpec("Start Next Mission", () -> sendAction(MineFluencePhoneAction.START_NEXT_MISSION)));
 		}
 
-		buttons.add(new ButtonSpec("Close", this::close));
-		return buttons;
+		if (!isState(MineFluencePhoneStateResponsePayload.STATE_NOT_STARTED)) {
+			specs.add(new ButtonSpec("Help", this::openHelp));
+		}
+		specs.add(new ButtonSpec("Close", this::close));
+		return specs;
 	}
 
-	private void drawStatusPanel(DrawContext context) {
-		boolean wide = width >= WIDE_LAYOUT_WIDTH;
-		int panelX = 24;
-		int panelY = 38;
-		int panelWidth = wide ? Math.max(180, width - BUTTON_WIDTH - 70) : Math.max(120, width - 48);
-		int panelBottom = wide ? height - 32 : Math.max(panelY + 56, buttonStartY - 10);
+	private void drawPanel(DrawContext context, PhoneLayout layout) {
+		int left = layout.panelX() - 8;
+		int top = layout.panelY() - 8;
+		int right = layout.panelX() + layout.panelWidth() + 8;
+		context.fill(left, top, right, layout.panelBottom(), PANEL_BACKGROUND);
+		context.drawBorder(left, top, right - left, layout.panelBottom() - top, PANEL_BORDER);
+	}
 
-		context.fill(panelX - 8, panelY - 8, panelX + panelWidth + 8, panelBottom, PANEL_BACKGROUND);
-		context.drawBorder(panelX - 8, panelY - 8, panelWidth + 16, panelBottom - panelY + 8, PANEL_BORDER);
+	private void drawStatusText(DrawContext context, PhoneLayout layout) {
+		int x = layout.panelX();
+		int y = layout.panelY();
+		int maxWidth = layout.panelWidth();
+		int bottom = layout.panelBottom() - 7;
 
-		int y = panelY;
-		y = drawWrappedLine(context, "Status", panelX, y, panelWidth, ACCENT_COLOR);
-		y = drawWrappedLine(context, "Job: " + labelValue(state.selectedJob(), "None"), panelX, y, panelWidth, TEXT_COLOR);
-		y = drawWrappedLine(context, "Followers: " + state.follower(), panelX, y, panelWidth, TEXT_COLOR);
-		y = drawWrappedLine(context, "Social Credibility: " + state.socialCredibility(), panelX, y, panelWidth, TEXT_COLOR);
-		y = drawWrappedLine(context, "Lie Gauge: " + liePercent() + "%", panelX, y, panelWidth, TEXT_COLOR);
-		y = drawWrappedLine(context, "Mission Count: " + state.completedMissionCount() + "/" + MineFluenceBalance.TOTAL_DEMO_MISSIONS, panelX, y, panelWidth, TEXT_COLOR);
-		y = drawWrappedLine(context, "Weapon Tier: " + displayValue(state.weaponTier(), "Wood"), panelX, y, panelWidth, TEXT_COLOR);
-		y += 4;
-		y = drawWrappedLine(context, "Current Task:", panelX, y, panelWidth, ACCENT_COLOR);
-		for (String line : taskLines()) {
-			if (y + 12 > panelBottom) {
-				break;
-			}
-			y = drawWrappedLine(context, line, panelX, y, panelWidth, TEXT_COLOR);
+		y = drawWrappedLine(context, "Player Status", x, y, maxWidth, bottom, ACCENT_COLOR);
+		y = drawWrappedLine(context, "Job: " + labelValue(state.selectedJob(), "None"), x, y, maxWidth, bottom, TEXT_COLOR);
+		y = drawWrappedLine(context, "Followers: " + state.follower(), x, y, maxWidth, bottom, TEXT_COLOR);
+		y = drawWrappedLine(context, "Social Credibility: " + signed(state.socialCredibility()), x, y, maxWidth, bottom, TEXT_COLOR);
+		y = drawWrappedLine(context, "Lie Risk: " + MineFluenceBalance.getLieRiskLabel(state.lieValue()), x, y, maxWidth, bottom, TEXT_COLOR);
+		y = drawWrappedLine(context, "Weapon: " + weaponName(), x, y, maxWidth, bottom, TEXT_COLOR);
+		y = drawWrappedLine(context, "Missions: " + state.completedMissionCount() + "/" + MineFluenceBalance.TOTAL_DEMO_MISSIONS, x, y, maxWidth, bottom, TEXT_COLOR);
+		y += 3;
+		y = drawWrappedLine(context, "Current State", x, y, maxWidth, bottom, ACCENT_COLOR);
+		y = drawWrappedLine(context, "State: " + stateLabel(), x, y, maxWidth, bottom, TEXT_COLOR);
+		y = drawWrappedLine(context, "Next: " + nextAction(), x, y, maxWidth, bottom, WARNING_COLOR);
+
+		for (String detail : stateDetails()) {
+			y = drawWrappedLine(context, detail, x, y, maxWidth, bottom, TEXT_COLOR);
 		}
-		y += 4;
-		if (y + 12 <= panelBottom) {
-			y = drawWrappedLine(context, "Next: " + nextAction(), panelX, y, panelWidth, WARNING_COLOR);
-		}
-		if (!safeText(localMessage).isBlank() && y + 12 <= panelBottom) {
-			drawWrappedLine(context, safeText(localMessage), panelX, y, panelWidth, MUTED_TEXT_COLOR);
+		if (!safeText(localMessage).isBlank()) {
+			drawWrappedLine(context, safeText(localMessage), x, y + 2, maxWidth, bottom, MUTED_TEXT_COLOR);
 		}
 	}
 
-	private List<String> taskLines() {
+	private List<String> stateDetails() {
 		List<String> lines = new ArrayList<>();
-		if (state.endingTriggered()) {
+		if (isEndingState()) {
 			lines.add("Ending: " + displayValue(state.endingName(), "Unknown"));
 			return lines;
 		}
-		if (state.activeInvasionIndex() > 0) {
-			lines.add("Invasion " + state.activeInvasionIndex() + " - Defend the village");
-			lines.add("Invaders: " + state.invasionRemaining() + "/" + state.invasionTotal());
+		if (isState(MineFluencePhoneStateResponsePayload.STATE_INVASION)) {
+			lines.add("Invasion Level: " + state.activeInvasionIndex());
+			lines.add("Enemies: " + state.invasionRemaining() + "/" + state.invasionTotal());
+			lines.add("Support Allies: " + state.supportAllyCount());
 			return lines;
 		}
-		if (isPosting()) {
-			lines.add("Mission " + state.missionIndex() + " - " + routeLabel(state.route()) + " ready to upload");
-			lines.add(displayValue(state.title(), "Content upload pending"));
+		if (isState(MineFluencePhoneStateResponsePayload.STATE_READY_TO_UPLOAD)) {
+			lines.add("Mission " + state.missionIndex() + " - " + routeLabel(state.route()));
+			lines.add(displayValue(state.title(), "Upload pending"));
 			return lines;
 		}
-		if (isPendingMissionSelection()) {
-			int missionIndex = state.pendingMissionSelectionIndex() > 0 ? state.pendingMissionSelectionIndex() : state.missionIndex();
-			lines.add("Mission " + missionIndex + " route selection");
-			lines.add("Choose Good or Bad.");
+		if (isState(MineFluencePhoneStateResponsePayload.STATE_MISSION_CHOICE)) {
+			int missionIndex = state.pendingMissionSelectionIndex() > 0
+					? state.pendingMissionSelectionIndex()
+					: state.missionIndex();
+			lines.add("Mission: " + missionIndex + "/" + MineFluenceBalance.TOTAL_DEMO_MISSIONS);
 			return lines;
 		}
-		if (isActiveMission()) {
+		if (isState(MineFluencePhoneStateResponsePayload.STATE_MISSION_ACTIVE)) {
 			lines.add("Mission " + state.missionIndex() + " - " + routeLabel(state.route()));
 			lines.add(displayValue(state.title(), "Active mission"));
-			lines.add(displayValue(state.objectiveText(), "Complete the current objective."));
+			lines.add("Objective: " + displayValue(state.objectiveText(), "Complete the objective."));
 			lines.add("Progress: " + state.currentProgress() + "/" + state.targetProgress());
-			return lines;
+			lines.add("Area: " + displayValue(state.requiredAreaName(), "Not required"));
 		}
-		lines.add(displayValue(state.message(), "No active mission."));
 		return lines;
 	}
 
+	private String stateLabel() {
+		if (state.exposureTriggered() || isState(MineFluencePhoneStateResponsePayload.STATE_EXPOSED)) {
+			return "Exposed / Collapse";
+		}
+		return switch (state.state()) {
+			case MineFluencePhoneStateResponsePayload.STATE_NOT_STARTED -> "Not Started";
+			case MineFluencePhoneStateResponsePayload.STATE_CHOOSE_JOB -> "Choose Job";
+			case MineFluencePhoneStateResponsePayload.STATE_READY -> "Ready";
+			case MineFluencePhoneStateResponsePayload.STATE_MISSION_CHOICE -> "Mission Choice";
+			case MineFluencePhoneStateResponsePayload.STATE_MISSION_ACTIVE -> "Mission Active";
+			case MineFluencePhoneStateResponsePayload.STATE_READY_TO_UPLOAD -> "Ready to Upload";
+			case MineFluencePhoneStateResponsePayload.STATE_INVASION -> "Invasion Active";
+			case MineFluencePhoneStateResponsePayload.STATE_ENDING -> "Ending";
+			default -> displayValue(state.state(), "Ready");
+		};
+	}
+
 	private String nextAction() {
-		if (state.endingTriggered()) {
-			return "Ending reached. Play the ending video.";
+		if (state.exposureTriggered() || isState(MineFluencePhoneStateResponsePayload.STATE_EXPOSED)) {
+			return state.endingVideoAvailable()
+					? "Play the ending video or restart the demo."
+					: "Restart the demo.";
 		}
-		if (state.activeInvasionIndex() > 0) {
-			return "Defend the village from invaders.";
+		if (isEndingState()) {
+			return state.endingVideoAvailable()
+					? "Play the ending video or restart the demo."
+					: "Restart the demo.";
 		}
-		if (isPosting()) {
-			return "Choose how to upload your content.";
+		if (isState(MineFluencePhoneStateResponsePayload.STATE_INVASION)) {
+			return "Defend the village.";
 		}
-		if (isPendingMissionSelection()) {
-			return "Choose Good or Bad mission.";
+		if (isState(MineFluencePhoneStateResponsePayload.STATE_READY_TO_UPLOAD)) {
+			return "Open Upload Screen to choose a posting type.";
 		}
-		if (isActiveMission()) {
-			String area = requiredAreaName();
-			if (area != null) {
-				return "Go to the highlighted " + area + " area.";
-			}
-			return "Complete the current mission objective.";
+		if (isState(MineFluencePhoneStateResponsePayload.STATE_MISSION_CHOICE)) {
+			return "Open Mission Board to choose Good or Bad.";
 		}
-		if (!hasFarmerJob()) {
-			return isLikelyResetState() ? "Press Start Demo to begin." : "Choose Farmer to start the demo.";
+		if (isState(MineFluencePhoneStateResponsePayload.STATE_MISSION_ACTIVE)) {
+			return "Complete the current objective.";
+		}
+		if (isState(MineFluencePhoneStateResponsePayload.STATE_NOT_STARTED)) {
+			return "Play the tutorial to begin.";
+		}
+		if (isState(MineFluencePhoneStateResponsePayload.STATE_CHOOSE_JOB)) {
+			return "Choose Farmer.";
 		}
 		if (state.completedMissionCount() < MineFluenceBalance.TOTAL_DEMO_MISSIONS) {
 			return "Start the next mission.";
 		}
-		return "Check the ending or demo status.";
+		return "Wait for the ending state.";
 	}
 
-	private int drawWrappedLine(DrawContext context, String value, int x, int y, int maxWidth, int color) {
+	private int drawWrappedLine(
+			DrawContext context,
+			String value,
+			int x,
+			int y,
+			int maxWidth,
+			int bottom,
+			int color
+	) {
 		List<OrderedText> lines = textRenderer.wrapLines(Text.literal(safeText(value)), Math.max(40, maxWidth));
 		for (OrderedText line : lines) {
+			if (y + 10 > bottom) {
+				return y;
+			}
 			context.drawTextWithShadow(textRenderer, line, x, y, color);
 			y += 11;
 		}
 		return y + 1;
+	}
+
+	private PhoneLayout layout(int buttonCount) {
+		boolean wide = width >= WIDE_LAYOUT_WIDTH;
+		if (wide) {
+			int buttonWidth = Math.min(154, Math.max(112, width / 3));
+			int buttonX = width - buttonWidth - 18;
+			int panelX = 18;
+			int buttonStartY = Math.max(38, (height - buttonCount * BUTTON_STEP) / 2);
+			return new PhoneLayout(
+					panelX,
+					36,
+					Math.max(100, buttonX - panelX - 14),
+					height - 16,
+					buttonX,
+					buttonStartY,
+					buttonWidth
+			);
+		}
+
+		int buttonWidth = Math.min(154, Math.max(100, width - 32));
+		int buttonStartY = Math.max(104, height - buttonCount * BUTTON_STEP - 10);
+		return new PhoneLayout(
+				18,
+				36,
+				Math.max(80, width - 36),
+				Math.max(90, buttonStartY - 8),
+				(width - buttonWidth) / 2,
+				buttonStartY,
+				buttonWidth
+		);
 	}
 
 	private void renderButtons(DrawContext context, int mouseX, int mouseY, float delta) {
@@ -221,16 +276,10 @@ public class MineFluenceSmartphoneHomeScreen extends Screen {
 
 	private void sendAction(MineFluencePhoneAction action) {
 		if (MineFluenceClientNetworking.sendPhoneAction(action)) {
-			localMessage = "Action sent.";
+			localMessage = "Action requested.";
 			return;
 		}
 		localMessage = "Server smartphone action channel is not available.";
-	}
-
-	private void refresh() {
-		if (!MineFluenceClientNetworking.requestPhoneState()) {
-			localMessage = "Server smartphone state channel is not available.";
-		}
 	}
 
 	private void openMissionBoard() {
@@ -245,64 +294,30 @@ public class MineFluenceSmartphoneHomeScreen extends Screen {
 		}
 	}
 
-	private void openTutorial() {
+	private void openHelp() {
 		if (client != null) {
-			client.setScreen(new MineFluenceTutorialScreen());
+			client.setScreen(new MineFluenceSmartphoneHelpScreen(state));
 		}
 	}
 
-	private void viewProgress() {
-		localMessage = "Progress: " + state.currentProgress() + "/" + state.targetProgress() + ". " + state.message();
+	private boolean isEndingState() {
+		return state.endingTriggered()
+				|| isState(MineFluencePhoneStateResponsePayload.STATE_ENDING)
+				|| isState(MineFluencePhoneStateResponsePayload.STATE_EXPOSED);
 	}
 
-	private void viewInvasionStatus() {
-		localMessage = "Invasion " + state.activeInvasionIndex() + ": invaders remaining " + state.invasionRemaining() + "/" + state.invasionTotal() + ".";
+	private boolean isState(String expected) {
+		return expected.equals(state.state());
 	}
 
-	private void viewEnding() {
-		localMessage = "Ending: " + displayValue(state.endingName(), "Unknown") + ".";
-	}
-
-	private boolean isPosting() {
-		return MineFluencePhoneStateResponsePayload.STATE_POSTING.equals(state.state());
-	}
-
-	private boolean isPendingMissionSelection() {
-		return state.pendingMissionSelectionIndex() > 0 || MineFluencePhoneStateResponsePayload.STATE_MISSION_BOARD.equals(state.state());
-	}
-
-	private boolean isActiveMission() {
-		return state.missionIndex() > 0 && MineFluencePhoneStateResponsePayload.STATE_STATUS.equals(state.state());
-	}
-
-	private boolean hasFarmerJob() {
-		return "farmer".equalsIgnoreCase(safeText(state.selectedJob()));
-	}
-
-	private boolean isLikelyResetState() {
-		return state.completedMissionCount() == MineFluenceBalance.COMPLETED_MISSION_DEFAULT
-				&& state.follower() == MineFluenceBalance.FOLLOWER_DEFAULT
-				&& state.socialCredibility() == MineFluenceBalance.SOCIAL_CREDIBILITY_DEFAULT
-				&& state.lieValue() == MineFluenceBalance.LIE_VALUE_DEFAULT;
-	}
-
-	private int liePercent() {
-		if (MineFluenceBalance.LIE_VALUE_MAX <= 0) {
-			return 0;
-		}
-		return Math.round(state.lieValue() * 100.0F / MineFluenceBalance.LIE_VALUE_MAX);
-	}
-
-	private String requiredAreaName() {
-		if (!"GOOD".equalsIgnoreCase(safeText(state.route()))) {
-			return null;
-		}
-		return switch (state.missionIndex()) {
-			case 1 -> "Garden";
-			case 2 -> "Farm";
-			case 6 -> "Shared";
-			case 7 -> "Farm Build";
-			default -> null;
+	private String weaponName() {
+		return switch (safeText(state.weaponTier()).toLowerCase(Locale.ROOT)) {
+			case "wood", "wooden" -> "Wooden Farmer Hoe";
+			case "stone" -> "Stone Farmer Hoe";
+			case "iron" -> "Iron Farmer Hoe";
+			case "gold", "golden" -> "Gold Farmer Hoe";
+			case "diamond" -> "Diamond Farmer Hoe";
+			default -> displayValue(state.weaponTier(), "Wooden") + " Farmer Hoe";
 		};
 	}
 
@@ -318,10 +333,7 @@ public class MineFluenceSmartphoneHomeScreen extends Screen {
 
 	private static String displayValue(String value, String fallback) {
 		String safeValue = safeText(value);
-		if (safeValue.isBlank()) {
-			return fallback;
-		}
-		return safeValue;
+		return safeValue.isBlank() ? fallback : safeValue;
 	}
 
 	private static String labelValue(String value, String fallback) {
@@ -330,9 +342,14 @@ public class MineFluenceSmartphoneHomeScreen extends Screen {
 			return fallback;
 		}
 		if (safeValue.length() == 1) {
-			return safeValue.toUpperCase();
+			return safeValue.toUpperCase(Locale.ROOT);
 		}
-		return safeValue.substring(0, 1).toUpperCase() + safeValue.substring(1).toLowerCase();
+		return safeValue.substring(0, 1).toUpperCase(Locale.ROOT)
+				+ safeValue.substring(1).toLowerCase(Locale.ROOT);
+	}
+
+	private static String signed(int value) {
+		return value > 0 ? "+" + value : Integer.toString(value);
 	}
 
 	private static String safeText(String value) {
@@ -340,5 +357,16 @@ public class MineFluenceSmartphoneHomeScreen extends Screen {
 	}
 
 	private record ButtonSpec(String label, Runnable action) {
+	}
+
+	private record PhoneLayout(
+			int panelX,
+			int panelY,
+			int panelWidth,
+			int panelBottom,
+			int buttonX,
+			int buttonStartY,
+			int buttonWidth
+	) {
 	}
 }

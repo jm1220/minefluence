@@ -83,9 +83,11 @@ public final class MineFluenceDisplay {
 				+ ", Current Weapon Tier=" + MineFluenceWeaponManager.determineTier(data.getFollower())
 				+ ", Ending Triggered=" + data.isEndingTriggered()
 				+ ", Ending Id=" + data.getEndingId()
+				+ ", Exposure Triggered=" + data.isExposureTriggered()
 				+ ", Calculated Follower Ending Tier=" + MineFluenceEndingManager.calculateFollowerTier(data.getFollower())
 				+ ", Calculated Social Ending Tier=" + MineFluenceEndingManager.calculateSocialTier(data.getSocialCredibility())
-				+ ", Lie Value(debug hidden stat)=" + data.getLieValue();
+				+ ", Lie Value(debug hidden stat)=" + data.getLieValue()
+				+ ", Lie Risk=" + MineFluenceBalance.getLieRiskLabel(data.getLieValue());
 	}
 
 	private static String shortMissionState(MineFluencePlayerData data) {

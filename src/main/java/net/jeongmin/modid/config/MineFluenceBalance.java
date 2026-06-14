@@ -11,6 +11,7 @@ public final class MineFluenceBalance {
 
 	public static final int LIE_VALUE_MIN = 0;
 	public static final int LIE_VALUE_MAX = 100;
+	public static final int LIE_EXPOSURE_THRESHOLD = 100;
 	public static final int LIE_VALUE_DEFAULT = 0;
 
 	public static final int TOTAL_DEMO_MISSIONS = 7;
@@ -30,8 +31,18 @@ public final class MineFluenceBalance {
 
 	public static final double EXAGGERATED_POSTING_MULTIPLIER = 1.5D;
 	public static final double EXAGGERATED_POST_MULTIPLIER = EXAGGERATED_POSTING_MULTIPLIER;
-	public static final int LIE_VALUE_INCREASE_PER_EXAGGERATED_POST = 10;
+	@Deprecated
+	public static final int LIE_VALUE_INCREASE_PER_EXAGGERATED_POST = 0;
+	@Deprecated
 	public static final int LIE_VALUE_PER_EXAGGERATED_POST = LIE_VALUE_INCREASE_PER_EXAGGERATED_POST;
+
+	public static final int FARMER_MISSION_1_LIE_INCREASE = 18;
+	public static final int FARMER_MISSION_2_LIE_INCREASE = 31;
+	public static final int FARMER_MISSION_3_LIE_INCREASE = 14;
+	public static final int FARMER_MISSION_4_LIE_INCREASE = 37;
+	public static final int FARMER_MISSION_5_LIE_INCREASE = 22;
+	public static final int FARMER_MISSION_6_LIE_INCREASE = 28;
+	public static final int FARMER_MISSION_7_LIE_INCREASE = 40;
 
 	public static final int FARMER_MISSION_1_FOLLOWER_REWARD = 1;
 	public static final int FARMER_MISSION_1_SOCIAL_REWARD = 10;
@@ -103,6 +114,17 @@ public final class MineFluenceBalance {
 	public static final int INVASION_MAX_SPAWN_ATTEMPTS = 16;
 	public static final int INVASION_TICK_FEEDBACK_INTERVAL = 20;
 
+	// Stage 6 placeholder balance tiers for temporary invasion support allies.
+	public static final int INVASION_SUPPORT_TIER_1_MIN_SOCIAL = -299;
+	public static final int INVASION_SUPPORT_TIER_2_MIN_SOCIAL = -99;
+	public static final int INVASION_SUPPORT_TIER_3_MIN_SOCIAL = 100;
+	public static final int INVASION_SUPPORT_TIER_4_MIN_SOCIAL = 300;
+	public static final int INVASION_SUPPORT_TIER_0_COUNT = 0;
+	public static final int INVASION_SUPPORT_TIER_1_COUNT = 1;
+	public static final int INVASION_SUPPORT_TIER_2_COUNT = 2;
+	public static final int INVASION_SUPPORT_TIER_3_COUNT = 3;
+	public static final int INVASION_SUPPORT_TIER_4_COUNT = 5;
+
 	public static final int LIE_PENALTY_MINOR_THRESHOLD = 30;
 	public static final int LIE_PENALTY_MAJOR_THRESHOLD = 70;
 	public static final int LIE_PENALTY_MINOR_SOCIAL_CREDIBILITY = -10;
@@ -113,6 +135,23 @@ public final class MineFluenceBalance {
 	public static final int WEAPON_TIER_IRON_FOLLOWERS = 30;
 	public static final int WEAPON_TIER_GOLD_FOLLOWERS = 60;
 	public static final int WEAPON_TIER_DIAMOND_FOLLOWERS = 90;
+
+	// Stage 5 balance placeholders for visible fan villagers.
+	public static final int FAN_TIER_1_MIN_FOLLOWERS = 10;
+	public static final int FAN_TIER_2_MIN_FOLLOWERS = 30;
+	public static final int FAN_TIER_3_MIN_FOLLOWERS = 60;
+	public static final int FAN_TIER_4_MIN_FOLLOWERS = 90;
+	public static final int FAN_TIER_0_COUNT = 0;
+	public static final int FAN_TIER_1_COUNT = 2;
+	public static final int FAN_TIER_2_COUNT = 4;
+	public static final int FAN_TIER_3_COUNT = 7;
+	public static final int FAN_TIER_4_COUNT = 10;
+
+	public static final double FARMER_HOE_WOOD_INVASION_BONUS_DAMAGE = 2.0D;
+	public static final double FARMER_HOE_STONE_INVASION_BONUS_DAMAGE = 4.0D;
+	public static final double FARMER_HOE_IRON_INVASION_BONUS_DAMAGE = 6.0D;
+	public static final double FARMER_HOE_GOLD_INVASION_BONUS_DAMAGE = 8.0D;
+	public static final double FARMER_HOE_DIAMOND_INVASION_BONUS_DAMAGE = 10.0D;
 
 	public static final int ENDING_FOLLOWER_MID_THRESHOLD = 30;
 	public static final int ENDING_FOLLOWER_HIGH_THRESHOLD = 70;
@@ -126,12 +165,73 @@ public final class MineFluenceBalance {
 		return clamp(value, FOLLOWER_MIN, FOLLOWER_MAX);
 	}
 
+	public static int getTargetFanCount(int followers) {
+		if (followers >= FAN_TIER_4_MIN_FOLLOWERS) {
+			return FAN_TIER_4_COUNT;
+		}
+		if (followers >= FAN_TIER_3_MIN_FOLLOWERS) {
+			return FAN_TIER_3_COUNT;
+		}
+		if (followers >= FAN_TIER_2_MIN_FOLLOWERS) {
+			return FAN_TIER_2_COUNT;
+		}
+		if (followers >= FAN_TIER_1_MIN_FOLLOWERS) {
+			return FAN_TIER_1_COUNT;
+		}
+		return FAN_TIER_0_COUNT;
+	}
+
 	public static int clampSocialCredibility(int value) {
 		return clamp(value, SOCIAL_CREDIBILITY_MIN, SOCIAL_CREDIBILITY_MAX);
 	}
 
+	public static int getInvasionSupportCount(int socialCredibility) {
+		if (socialCredibility >= INVASION_SUPPORT_TIER_4_MIN_SOCIAL) {
+			return INVASION_SUPPORT_TIER_4_COUNT;
+		}
+		if (socialCredibility >= INVASION_SUPPORT_TIER_3_MIN_SOCIAL) {
+			return INVASION_SUPPORT_TIER_3_COUNT;
+		}
+		if (socialCredibility >= INVASION_SUPPORT_TIER_2_MIN_SOCIAL) {
+			return INVASION_SUPPORT_TIER_2_COUNT;
+		}
+		if (socialCredibility >= INVASION_SUPPORT_TIER_1_MIN_SOCIAL) {
+			return INVASION_SUPPORT_TIER_1_COUNT;
+		}
+		return INVASION_SUPPORT_TIER_0_COUNT;
+	}
+
 	public static int clampLieValue(int value) {
-		return clamp(value, LIE_VALUE_MIN, LIE_VALUE_MAX);
+		return Math.max(LIE_VALUE_MIN, value);
+	}
+
+	public static int getLieIncreaseForMission(int missionIndex) {
+		return switch (missionIndex) {
+			case 1 -> FARMER_MISSION_1_LIE_INCREASE;
+			case 2 -> FARMER_MISSION_2_LIE_INCREASE;
+			case 3 -> FARMER_MISSION_3_LIE_INCREASE;
+			case 4 -> FARMER_MISSION_4_LIE_INCREASE;
+			case 5 -> FARMER_MISSION_5_LIE_INCREASE;
+			case 6 -> FARMER_MISSION_6_LIE_INCREASE;
+			case 7 -> FARMER_MISSION_7_LIE_INCREASE;
+			default -> 0;
+		};
+	}
+
+	public static String getLieRiskLabel(int lieValue) {
+		if (lieValue >= LIE_EXPOSURE_THRESHOLD) {
+			return "Exposed";
+		}
+		if (lieValue >= 90) {
+			return "Critical";
+		}
+		if (lieValue >= 60) {
+			return "Dangerous";
+		}
+		if (lieValue >= 30) {
+			return "Suspicious";
+		}
+		return "Stable";
 	}
 
 	public static int clampCompletedMissionCount(int value) {

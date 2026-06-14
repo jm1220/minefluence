@@ -49,6 +49,7 @@ public final class MineFluenceInvasionManager {
 			return false;
 		}
 
+		MineFluenceInvasionSupportManager.clearSupportAllies(player);
 		InvasionStrength strength = determineStrength(invasionIndex, data.getSocialCredibility());
 		int mobCount = getMobCountForStrength(strength);
 		List<UUID> spawnedMobUuids = spawnFarmerInvasionMobs(player, mobCount);
@@ -60,6 +61,7 @@ public final class MineFluenceInvasionManager {
 		data.startInvasion(invasionIndex, spawnedMobUuids, player.getServer().getTicks());
 		MineFluenceWorldState.get(player.getServer()).markDirty();
 		MineFluenceDisplay.sendChat(player, "Invasion " + invasionIndex + " started! Strength: " + strength + ". DDJ moles: " + spawnedMobUuids.size() + ".");
+		MineFluenceInvasionSupportManager.spawnForInvasion(player, data);
 		MineFluenceDisplay.sendActionBar(player, "[MineFluence] Invasion " + invasionIndex + ": Invaders remaining " + spawnedMobUuids.size());
 		MineFluenceHud.refresh(player, data);
 		return true;
@@ -93,13 +95,25 @@ public final class MineFluenceInvasionManager {
 		return remaining;
 	}
 
+	public static boolean isActiveTrackedInvader(MineFluencePlayerData data, Entity entity) {
+		return data.hasActiveInvasion()
+				&& entity != null
+				&& data.getActiveInvasionMobUuids().contains(entity.getUuid())
+				&& isRemainingInvader(entity)
+				&& (entity instanceof DdjEntity || entity.getCommandTags().contains(INVADER_TAG));
+	}
+
 	public static void stopInvasionDebug(ServerPlayerEntity player, MineFluencePlayerData data) {
 		if (!data.hasActiveInvasion()) {
-			MineFluenceDisplay.sendChat(player, "No active invasion to stop.");
+			int removedSupport = MineFluenceInvasionSupportManager.clearSupportAllies(player);
+			MineFluenceDisplay.sendChat(player, removedSupport > 0
+					? "No active invasion. Removed " + removedSupport + " stale village defender(s)."
+					: "No active invasion to stop.");
 			return;
 		}
 
 		removeTrackedMobs(player.getServer(), data);
+		MineFluenceInvasionSupportManager.clearSupportAllies(player);
 		data.clearInvasionState();
 		MineFluenceWorldState.get(player.getServer()).markDirty();
 		MineFluenceDisplay.sendChat(player, "Active invasion stopped and tracked mobs were removed.");
@@ -111,6 +125,7 @@ public final class MineFluenceInvasionManager {
 		if (data.hasActiveInvasion() || data.getTrackedInvasionMobCount() > 0) {
 			removeTrackedMobs(player.getServer(), data);
 		}
+		MineFluenceInvasionSupportManager.clearSupportAllies(player);
 		data.clearInvasionState();
 	}
 
@@ -152,6 +167,7 @@ public final class MineFluenceInvasionManager {
 				continue;
 			}
 
+			MineFluenceInvasionSupportManager.updateCombatTargets(player, data);
 			MineFluenceDisplay.sendActionBar(player, "[MineFluence] Invasion " + data.getActiveInvasionIndex() + ": Invaders remaining " + remainingMobUuids.size());
 			MineFluenceHud.refresh(player, data);
 		}
@@ -230,6 +246,7 @@ public final class MineFluenceInvasionManager {
 
 	private static void completeInvasion(ServerPlayerEntity player, MineFluencePlayerData data) {
 		int invasionIndex = data.getActiveInvasionIndex();
+		MineFluenceInvasionSupportManager.clearSupportAllies(player);
 		data.setLastCompletedInvasionIndex(invasionIndex);
 		data.clearInvasionState();
 		MineFluenceWorldState.get(player.getServer()).markDirty();
@@ -244,6 +261,7 @@ public final class MineFluenceInvasionManager {
 
 	private static void failInvasion(ServerPlayerEntity player, MineFluencePlayerData data) {
 		removeTrackedMobs(player.getServer(), data);
+		MineFluenceInvasionSupportManager.clearSupportAllies(player);
 		data.clearInvasionState();
 		MineFluenceWorldState.get(player.getServer()).markDirty();
 		MineFluenceDisplay.sendChat(player, "Invasion failed. The village could not be defended.");
