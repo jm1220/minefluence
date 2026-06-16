@@ -45,7 +45,7 @@ public final class MineFluenceMissionSupplies {
 			case 1 -> List.of(new ItemStack(Items.POPPY, 3)); // Poppy is the chosen simple flower item.
 			case 2 -> List.of(new ItemStack(Items.WHEAT_SEEDS, 5));
 			case 4 -> List.of(new ItemStack(Items.POTATO, 10));
-			// Mission 5 requires obtaining composters after start, so direct supplies would undermine it.
+			// Mission 5 requires crafting and placing composters after start.
 			case 6 -> List.of(new ItemStack(Items.HAY_BLOCK, 1));
 			// The basic hoe is skipped because vanilla hoes are managed by the Farmer weapon upgrade system.
 			case 7 -> List.of(

@@ -16,6 +16,9 @@ The smartphone home screen uses one primary action per gameplay state. `Close` i
 | Invasion active | `Help`, `Close` |
 | Ending or exposure/collapse | `Play Ending Video` when supported, `Restart Demo`, `Help`, `Close` |
 
+Player death resets the persisted run to `NOT_STARTED`. After respawn, opening
+the reissued smartphone shows only `Tutorial` and `Close`.
+
 The active-mission status text always shows mission number, route, title, objective, progress, and either the required area or `Area: Not required`. Invasion counts and ending names are also displayed directly in the status panel.
 
 ## Removed Home Buttons

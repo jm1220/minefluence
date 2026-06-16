@@ -1,11 +1,13 @@
 package net.jeongmin.modid.core;
 
 import net.jeongmin.modid.area.MineFluenceDemoMapPreset;
+import net.jeongmin.modid.area.MineFluenceAreaGuideManager;
 import net.jeongmin.modid.data.MineFluencePlayerData;
 import net.jeongmin.modid.data.MineFluenceWorldState;
 import net.jeongmin.modid.fan.MineFluenceFanVillagers;
 import net.jeongmin.modid.invasion.MineFluenceInvasionManager;
 import net.jeongmin.modid.item.MineFluenceItems;
+import net.jeongmin.modid.mission.MineFluenceMissionProgressManager;
 import net.jeongmin.modid.network.MineFluenceNetworking;
 import net.jeongmin.modid.ui.MineFluenceDisplay;
 import net.jeongmin.modid.ui.MineFluenceHud;
@@ -17,15 +19,9 @@ public final class MineFluenceDemoFlow {
 	}
 
 	public static MineFluencePlayerData startDemo(ServerPlayerEntity player, boolean openTutorial) {
-		MineFluenceWorldState state = MineFluenceWorldState.get(player.getServer());
-		MineFluencePlayerData currentData = state.getPlayerData(player);
-		MineFluenceInvasionManager.clearInvasionForReset(player, currentData);
-		MineFluenceFanVillagers.clearFanVillagers(player);
-		MineFluencePlayerData data = state.updatePlayerData(player, MineFluencePlayerData::resetForDemoStart);
-		MineFluenceWeaponManager.updateWeapon(player, data);
+		MineFluencePlayerData data = resetStartedDemoProgress(player);
 		MineFluenceItems.ensureSingleSmartphone(player);
 		loadMissingDemoMapPresetAreas(player);
-		MineFluenceFanVillagers.syncFanVillagers(player);
 
 		MineFluenceDisplay.sendChat(player, "Welcome to MineFluence.");
 		MineFluenceDisplay.sendChat(player, "You are an influencer trying to gain followers and social credibility to defend the village.");
@@ -38,6 +34,14 @@ public final class MineFluenceDemoFlow {
 			MineFluenceDisplay.sendChat(player, "Run /minefluence tutorial to view the instructions.");
 		}
 		return data;
+	}
+
+	public static MineFluencePlayerData resetDemoProgress(ServerPlayerEntity player) {
+		return resetDemoState(player, false);
+	}
+
+	public static MineFluencePlayerData resetStartedDemoProgress(ServerPlayerEntity player) {
+		return resetDemoState(player, true);
 	}
 
 	public static MineFluencePlayerData chooseFarmer(ServerPlayerEntity player) {
@@ -61,5 +65,26 @@ public final class MineFluenceDemoFlow {
 			MineFluenceDisplay.sendChat(player, "Loaded missing area preset definitions: " + MineFluenceDemoMapPreset.areaNameList() + ".");
 		}
 		return loaded;
+	}
+
+	private static MineFluencePlayerData resetDemoState(ServerPlayerEntity player, boolean demoStarted) {
+		MineFluenceWorldState state = MineFluenceWorldState.get(player.getServer());
+		MineFluencePlayerData currentData = state.getPlayerData(player);
+		MineFluenceInvasionManager.clearInvasionForReset(player, currentData);
+		MineFluenceFanVillagers.clearFanVillagers(player);
+		MineFluenceAreaGuideManager.clearGuide(player);
+		MineFluenceMissionProgressManager.clearPlayerTransientState(player);
+
+		MineFluencePlayerData data = state.updatePlayerData(player, playerData -> {
+			if (demoStarted) {
+				playerData.resetForDemoStart();
+			} else {
+				playerData.resetForTutorialStart();
+			}
+		});
+		MineFluenceWeaponManager.updateWeapon(player, data);
+		MineFluenceFanVillagers.syncFanVillagers(player);
+		MineFluenceHud.refresh(player, data);
+		return data;
 	}
 }

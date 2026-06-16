@@ -15,26 +15,26 @@ public final class MineFluenceDemoMapPreset {
 			MineFluenceAreaType.SHARED_SPACE,
 			MineFluenceAreaType.FARM_BUILD_AREA
 	);
-	private static final BlockPos VILLAGE_CENTER = new BlockPos(10, -60, 15);
+	private static final BlockPos VILLAGE_CENTER = new BlockPos(-846, 65, 726);
 	private static final BlockPos FAN_VILLAGE_CENTER = VILLAGE_CENTER;
 	private static final List<BlockPos> FAN_SPAWN_POINTS = List.of(
-			new BlockPos(-2, -60, 8),
-			new BlockPos(2, -60, 8),
-			new BlockPos(6, -60, 12),
-			new BlockPos(10, -60, 16),
-			new BlockPos(14, -60, 20),
-			new BlockPos(18, -60, 24),
-			new BlockPos(22, -60, 20),
-			new BlockPos(18, -60, 12),
-			new BlockPos(10, -60, 4),
-			new BlockPos(4, -60, 2)
+			new BlockPos(-858, 65, 719),
+			new BlockPos(-854, 65, 719),
+			new BlockPos(-850, 65, 723),
+			new BlockPos(-846, 65, 727),
+			new BlockPos(-842, 65, 731),
+			new BlockPos(-838, 65, 735),
+			new BlockPos(-834, 65, 731),
+			new BlockPos(-838, 65, 723),
+			new BlockPos(-846, 65, 715),
+			new BlockPos(-852, 65, 713)
 	);
 	private static final List<BlockPos> INVASION_SUPPORT_SPAWN_POINTS = List.of(
-			new BlockPos(0, -60, 10),
-			new BlockPos(8, -60, 10),
-			new BlockPos(16, -60, 16),
-			new BlockPos(8, -60, 22),
-			new BlockPos(20, -60, 10)
+			new BlockPos(-856, 65, 721),
+			new BlockPos(-848, 65, 721),
+			new BlockPos(-840, 65, 727),
+			new BlockPos(-848, 65, 733),
+			new BlockPos(-836, 65, 721)
 	);
 
 	private static final int VERTICAL_PADDING_BELOW = 3;

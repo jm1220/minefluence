@@ -1,8 +1,10 @@
 package net.jeongmin.modid.billboard;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import net.jeongmin.modid.MineFluence;
 import net.jeongmin.modid.mission.MineFluenceMissionRoute;
@@ -14,6 +16,7 @@ public final class MineFluenceBillboardImageResolver {
 	public static final int LAST_MISSION_IMAGE_INDEX = 7;
 
 	private static final List<String> AVAILABLE_IMAGE_IDS = createAvailableImageIds();
+	private static final Set<String> MISSING_UPLOAD_ASSET_WARNINGS = new HashSet<>();
 
 	private MineFluenceBillboardImageResolver() {
 	}
@@ -23,8 +26,32 @@ public final class MineFluenceBillboardImageResolver {
 				? MineFluenceMissionRoute.GOOD
 				: route;
 		PostingStyle resolvedStyle = style == null ? PostingStyle.NORMAL : style;
-		String imageId = "mission_" + missionIndex + "_" + routeAssetSuffix(resolvedRoute) + "_" + resolvedStyle.assetSuffix();
-		return isKnownImageId(imageId) ? imageId : DEFAULT_IMAGE_ID;
+		String requestedImageId = missionImageId(missionIndex, resolvedRoute, resolvedStyle);
+
+		if (missionIndex < FIRST_MISSION_IMAGE_INDEX || missionIndex > LAST_MISSION_IMAGE_INDEX) {
+			MineFluence.LOGGER.warn(
+					"[MineFluence] Billboard upload image request out of range: mission={} route={} post={}; using {}.",
+					missionIndex,
+					resolvedRoute,
+					resolvedStyle,
+					DEFAULT_IMAGE_ID
+			);
+			return DEFAULT_IMAGE_ID;
+		}
+
+		if (!isKnownImageId(requestedImageId) || !assetExists(requestedImageId)) {
+			warnMissingUploadAsset(missionIndex, resolvedRoute, resolvedStyle, requestedImageId);
+			return DEFAULT_IMAGE_ID;
+		}
+
+		MineFluence.LOGGER.info(
+				"[MineFluence] Billboard upload image resolved: mission={} route={} post={} path={}",
+				missionIndex,
+				resolvedRoute,
+				resolvedStyle,
+				texturePath(requestedImageId)
+		);
+		return requestedImageId;
 	}
 
 	public static String resolveUploadedMissionImage(int missionIndex, PostingStyle style) {
@@ -32,7 +59,9 @@ public final class MineFluenceBillboardImageResolver {
 	}
 
 	public static Identifier textureForImageId(String imageId) {
-		return Identifier.of(MineFluence.MOD_ID, "textures/billboard/" + normalizeImageId(imageId) + ".png");
+		String normalizedImageId = normalizeImageId(imageId);
+		String resolvedImageId = isKnownImageId(normalizedImageId) ? normalizedImageId : DEFAULT_IMAGE_ID;
+		return Identifier.of(MineFluence.MOD_ID, "textures/billboard/" + resolvedImageId + ".png");
 	}
 
 	public static List<String> availableImageIds() {
@@ -65,16 +94,53 @@ public final class MineFluenceBillboardImageResolver {
 		List<String> imageIds = new ArrayList<>();
 		imageIds.add(DEFAULT_IMAGE_ID);
 		for (int missionIndex = FIRST_MISSION_IMAGE_INDEX; missionIndex <= LAST_MISSION_IMAGE_INDEX; missionIndex++) {
-			for (MineFluenceMissionRoute route : List.of(MineFluenceMissionRoute.GOOD, MineFluenceMissionRoute.BAD)) {
-				for (PostingStyle style : PostingStyle.values()) {
-					imageIds.add("mission_" + missionIndex + "_" + routeAssetSuffix(route) + "_" + style.assetSuffix());
-				}
-			}
+			imageIds.add("mission_" + missionIndex);
+			imageIds.add(missionImageId(missionIndex, MineFluenceMissionRoute.GOOD, PostingStyle.NORMAL));
+			imageIds.add(missionImageId(missionIndex, MineFluenceMissionRoute.GOOD, PostingStyle.EXAGGERATED));
+			imageIds.add(missionImageId(missionIndex, MineFluenceMissionRoute.BAD, PostingStyle.NORMAL));
+			imageIds.add(missionImageId(missionIndex, MineFluenceMissionRoute.BAD, PostingStyle.EXAGGERATED));
 		}
 		return List.copyOf(imageIds);
 	}
 
 	private static String routeAssetSuffix(MineFluenceMissionRoute route) {
 		return route == MineFluenceMissionRoute.BAD ? "bad" : "good";
+	}
+
+	private static String missionImageId(int missionIndex, MineFluenceMissionRoute route, PostingStyle style) {
+		return "mission_" + missionIndex + "_" + routeAssetSuffix(route) + "_" + style.assetSuffix();
+	}
+
+	private static boolean assetExists(String imageId) {
+		return MineFluenceBillboardImageResolver.class.getClassLoader().getResource(resourcePath(imageId)) != null;
+	}
+
+	private static void warnMissingUploadAsset(
+			int missionIndex,
+			MineFluenceMissionRoute route,
+			PostingStyle style,
+			String imageId
+	) {
+		String key = missionIndex + ":" + route + ":" + style + ":" + imageId;
+		if (!MISSING_UPLOAD_ASSET_WARNINGS.add(key)) {
+			return;
+		}
+
+		MineFluence.LOGGER.warn(
+				"[MineFluence] Billboard upload image missing: mission={} route={} post={} expectedPath={}; using {}.",
+				missionIndex,
+				route,
+				style,
+				texturePath(imageId),
+				texturePath(DEFAULT_IMAGE_ID)
+		);
+	}
+
+	private static String texturePath(String imageId) {
+		return "textures/billboard/" + imageId + ".png";
+	}
+
+	private static String resourcePath(String imageId) {
+		return "assets/" + MineFluence.MOD_ID + "/" + texturePath(imageId);
 	}
 }

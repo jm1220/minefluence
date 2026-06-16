@@ -34,15 +34,17 @@ The support tag is separate from the Stage 5 fan tag `minefluence_fan`.
 
 The fixed Overworld points are stored in `MineFluenceDemoMapPreset`:
 
-1. `(0, -60, 10)`
-2. `(8, -60, 10)`
-3. `(16, -60, 16)`
-4. `(8, -60, 22)`
-5. `(20, -60, 10)`
+1. `(-856, 65, 721)`
+2. `(-848, 65, 721)`
+3. `(-840, 65, 727)`
+4. `(-848, 65, 733)`
+5. `(-836, 65, 721)`
 
-The manager searches nearby horizontal offsets and up to eight blocks above or
-below each configured Y. A valid point requires solid ground, three blocks of
-clear non-fluid body space, and no block or entity collision for the golem.
+The points are arranged around the current village center
+`(-846, 65, 726)`. The manager searches a deterministic five-block horizontal
+radius and up to eight blocks above or below each configured Y. A valid point
+requires solid ground, three blocks of clear non-fluid body space, and no block
+or entity collision for the golem.
 
 ## Invasion Start
 
@@ -54,8 +56,9 @@ After invasion enemies are spawned and tracked, the support manager:
 1. Removes stale tagged defenders.
 2. Reads the player's current Social Credibility.
 3. Computes the target support count.
-4. Spawns defenders in unused configured slots.
-5. Sends one trust or no-trust message.
+4. Counts existing tagged defenders and removes any extras.
+5. Spawns only the missing defenders in unused configured slots.
+6. Sends one trust or no-trust message.
 
 Support allies are not spawned by a tick loop.
 
@@ -69,6 +72,21 @@ target.
 
 This targeting only selects active invasion enemies. It does not select the
 player, normal villagers, or fan villagers. DDJ's existing AI is unchanged.
+
+## Player And Villager Safety
+
+Only Iron Golems tagged `minefluence_invasion_support` receive the safety
+behavior.
+
+- Player-caused damage to a tagged support golem is cancelled.
+- The golem's target, attacker, anger state, and current navigation are cleared
+  immediately.
+- Every 10 server ticks, tagged support golems are checked again. Player,
+  villager, and fan-villager targets are cleared.
+- The normal invasion targeting pass still assigns living tracked DDJ enemies.
+
+No chat message is shown for an accidental hit. Normal vanilla Iron Golems are
+not affected.
 
 ## Cleanup And Reload
 
@@ -110,3 +128,8 @@ The existing workflow also exercises the full lifecycle:
   discovered until it returns or loads.
 - Debug-spawned defenders do not have invasion targets until a real invasion is
   active.
+- Player attacks do not damage tagged support golems. This is the safer MVP
+  behavior used to guarantee that accidental hits cannot create retaliation.
+- Concise server logs report the Social Credibility target, actual tagged count,
+  spawned/removed totals, successful slots, and explicit reasons for skipped
+  support spawning.

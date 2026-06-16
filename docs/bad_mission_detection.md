@@ -37,7 +37,10 @@ Progress only counts when:
 - Composter/farm block breaking: `PlayerBlockBreakEvents.AFTER`
 - Villager death: `ServerLivingEntityEvents.AFTER_DEATH`
 
-Villagers tagged `minefluence_fan` are ignored by the villager hit and death detectors. They are popularity feedback NPCs, not Bad Mission 3 or Bad Mission 7 targets.
+Normal vanilla villagers and MineFluence fan villagers tagged
+`minefluence_fan` both count for villager-based mission detectors. The target
+must still be a `VillagerEntity`, so DDJ enemies, support iron golems, players,
+animals, and unrelated tagged entities do not count.
 
 ## Bad Mission 2: Trample The Farm
 
@@ -90,7 +93,8 @@ The smartphone status screen reads the same `activeMissionProgress` and mission 
 - Bad Mission 4 is scoped to vanilla chest/trapped chest/double chest/barrel inventories. Other storage blocks are ignored.
 - Bad Mission 6 uses the existing target of 1, so the first valid farm-related block break inside `farm` completes the mission.
 - The project does not currently have villager-owned container metadata. Area membership is the ownership proxy.
-- MineFluence fan villagers are excluded from Bad Mission 3 and Bad Mission 7 progress.
+- MineFluence fan villagers count for Bad Mission 3 and Bad Mission 7 because
+  they are vanilla `VillagerEntity` instances with the `minefluence_fan` tag.
 
 ## Manual Test Steps
 

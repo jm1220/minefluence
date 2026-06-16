@@ -35,7 +35,7 @@ public final class FarmerMissions {
 					MineFluenceMissionRoute.GOOD,
 					"Local Farmer Collab",
 					"Build credibility by working directly with a farmer villager.",
-					"Interact with a farmer villager twice.",
+					"Complete 2 trades with a farmer villager.",
 					MineFluenceBalance.FARMER_MISSION_3_TARGET,
 					MineFluenceBalance.FARMER_MISSION_3_FOLLOWER_REWARD,
 					MineFluenceBalance.FARMER_MISSION_3_SOCIAL_REWARD
@@ -57,7 +57,7 @@ public final class FarmerMissions {
 					MineFluenceMissionRoute.GOOD,
 					"Workstation Boost",
 					"Create more capacity for village farming work.",
-					"Obtain 2 composters after starting this mission.",
+					"Craft and place 2 composters after starting this mission.",
 					MineFluenceBalance.FARMER_MISSION_5_TARGET,
 					MineFluenceBalance.FARMER_MISSION_5_FOLLOWER_REWARD,
 					MineFluenceBalance.FARMER_MISSION_5_SOCIAL_REWARD

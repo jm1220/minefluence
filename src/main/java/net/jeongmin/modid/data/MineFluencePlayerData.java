@@ -34,6 +34,8 @@ public final class MineFluencePlayerData {
 	private static final String CURRENT_WEAPON_TIER_KEY = "currentWeaponTier";
 	private static final String ACTIVE_MISSION_PROGRESS_KEY = "activeMissionProgress";
 	private static final String MISSION_BASELINE_VALUE_KEY = "missionBaselineValue";
+	private static final String MISSION_5_CRAFTED_COMPOSTERS_KEY = "mission5CraftedComposters";
+	private static final String MISSION_5_PLACED_COMPOSTERS_KEY = "mission5PlacedComposters";
 	private static final String SUPPLIES_GRANTED_MISSION_INDEX_KEY = "suppliesGrantedMissionIndex";
 	private static final String SUPPLIES_GRANTED_ROUTE_KEY = "suppliesGrantedRoute";
 	private static final String ENDING_TRIGGERED_KEY = "endingTriggered";
@@ -59,6 +61,8 @@ public final class MineFluencePlayerData {
 	private MineFluenceWeaponTier currentWeaponTier = MineFluenceWeaponTier.WOOD;
 	private int activeMissionProgress;
 	private int missionBaselineValue;
+	private int mission5CraftedComposters;
+	private int mission5PlacedComposters;
 	private int suppliesGrantedMissionIndex;
 	private MineFluenceMissionRoute suppliesGrantedRoute = MineFluenceMissionRoute.NONE;
 	private boolean endingTriggered;
@@ -132,6 +136,12 @@ public final class MineFluencePlayerData {
 		if (nbt.contains(MISSION_BASELINE_VALUE_KEY, NbtElement.INT_TYPE)) {
 			data.setMissionBaselineValue(nbt.getInt(MISSION_BASELINE_VALUE_KEY));
 		}
+		if (nbt.contains(MISSION_5_CRAFTED_COMPOSTERS_KEY, NbtElement.INT_TYPE)) {
+			data.setMission5CraftedComposters(nbt.getInt(MISSION_5_CRAFTED_COMPOSTERS_KEY));
+		}
+		if (nbt.contains(MISSION_5_PLACED_COMPOSTERS_KEY, NbtElement.INT_TYPE)) {
+			data.setMission5PlacedComposters(nbt.getInt(MISSION_5_PLACED_COMPOSTERS_KEY));
+		}
 		if (nbt.contains(SUPPLIES_GRANTED_MISSION_INDEX_KEY, NbtElement.INT_TYPE)) {
 			data.setSuppliesGrantedMissionIndex(nbt.getInt(SUPPLIES_GRANTED_MISSION_INDEX_KEY));
 		}
@@ -182,6 +192,8 @@ public final class MineFluencePlayerData {
 		nbt.putString(CURRENT_WEAPON_TIER_KEY, currentWeaponTier.serializedName());
 		nbt.putInt(ACTIVE_MISSION_PROGRESS_KEY, activeMissionProgress);
 		nbt.putInt(MISSION_BASELINE_VALUE_KEY, missionBaselineValue);
+		nbt.putInt(MISSION_5_CRAFTED_COMPOSTERS_KEY, mission5CraftedComposters);
+		nbt.putInt(MISSION_5_PLACED_COMPOSTERS_KEY, mission5PlacedComposters);
 		nbt.putInt(SUPPLIES_GRANTED_MISSION_INDEX_KEY, suppliesGrantedMissionIndex);
 		nbt.putString(SUPPLIES_GRANTED_ROUTE_KEY, suppliesGrantedRoute.serializedName());
 		nbt.putBoolean(ENDING_TRIGGERED_KEY, endingTriggered);
@@ -192,6 +204,16 @@ public final class MineFluencePlayerData {
 	}
 
 	public void resetForDemoStart() {
+		resetDemoProgress();
+		setDemoStarted(true);
+	}
+
+	public void resetForTutorialStart() {
+		resetDemoProgress();
+		setDemoStarted(false);
+	}
+
+	private void resetDemoProgress() {
 		setFollower(MineFluenceBalance.DEMO_START_FOLLOWER);
 		setSocialCredibility(MineFluenceBalance.DEMO_START_SOCIAL_CREDIBILITY);
 		setLieValue(MineFluenceBalance.DEMO_START_LIE_VALUE);
@@ -202,7 +224,6 @@ public final class MineFluencePlayerData {
 		clearInvasionState();
 		setCurrentWeaponTier(MineFluenceWeaponTier.WOOD);
 		clearEndingState();
-		setDemoStarted(true);
 	}
 
 	public int getFollower() {
@@ -328,6 +349,7 @@ public final class MineFluencePlayerData {
 		setPendingPostingMissionRoute(MineFluenceMissionRoute.NONE);
 		setActiveMissionProgress(0);
 		setMissionBaselineValue(0);
+		clearMission5ComposterProgress();
 		clearMissionSuppliesGrant();
 	}
 
@@ -346,6 +368,7 @@ public final class MineFluencePlayerData {
 		setPendingPostingMissionRoute(MineFluenceMissionRoute.NONE);
 		setActiveMissionProgress(0);
 		setMissionBaselineValue(0);
+		clearMission5ComposterProgress();
 		clearMissionSuppliesGrant();
 	}
 
@@ -438,6 +461,27 @@ public final class MineFluencePlayerData {
 
 	public void setMissionBaselineValue(int missionBaselineValue) {
 		this.missionBaselineValue = Math.max(0, missionBaselineValue);
+	}
+
+	public int getMission5CraftedComposters() {
+		return mission5CraftedComposters;
+	}
+
+	public void setMission5CraftedComposters(int mission5CraftedComposters) {
+		this.mission5CraftedComposters = Math.max(0, mission5CraftedComposters);
+	}
+
+	public int getMission5PlacedComposters() {
+		return mission5PlacedComposters;
+	}
+
+	public void setMission5PlacedComposters(int mission5PlacedComposters) {
+		this.mission5PlacedComposters = Math.max(0, mission5PlacedComposters);
+	}
+
+	public void clearMission5ComposterProgress() {
+		setMission5CraftedComposters(0);
+		setMission5PlacedComposters(0);
 	}
 
 	public int getSuppliesGrantedMissionIndex() {

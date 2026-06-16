@@ -10,7 +10,7 @@ Good Farmer supplies:
 - Mission 2, Wheat for the Village: `5x wheat seeds`.
 - Mission 3, Local Farmer Collab: no item required.
 - Mission 4, Potato Giveaway: `10x potatoes`.
-- Mission 5, Workstation Boost: no supplies. The objective is to obtain 2 composters after the mission starts, so directly giving composters would satisfy or undermine the mission.
+- Mission 5, Workstation Boost: no supplies. The player must craft and place 2 composters after the mission starts, so directly giving composters would undermine the objective.
 - Mission 6, Shared Supplies: `1x hay bale`.
 - Mission 7, Community Farm Plot: `1x water bucket`, `1x composter`, `8x wheat seeds`.
 

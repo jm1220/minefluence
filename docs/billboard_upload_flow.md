@@ -8,31 +8,17 @@ When a player successfully posts a completed mission, the shared server posting 
 
 Command posting and smartphone posting both call `MineFluencePostingService.postMission`, so both paths use the same billboard upload resolver.
 
-## Mission Thumbnail Naming
+## Mission Thumbnail Mapping
 
-Uploaded mission thumbnails now use:
+Automatic uploads use the 28 packaged mission-specific billboard images:
+7 missions x Good/Bad route x Normal/Exaggerated posting style. The resolver
+maps mission number, route, and posting style directly to the filename
+convention documented in `docs/billboard_upload_mapping.md`.
 
-`mission_<index>_<route>_<posting>.png`
-
-Mappings:
-
-- `index`: mission number `1` through `7`
-- `route`: `GOOD` -> `good`, `BAD` -> `bad`
-- `posting`: normal/normally -> `normally`, exaggerate/exaggerated -> `exaggerated`
-
-Examples:
-
-- `mission_1_good_normally.png`
-- `mission_1_good_exaggerated.png`
-- `mission_1_bad_normally.png`
-- `mission_1_bad_exaggerated.png`
-- `mission_7_bad_exaggerated.png`
-
-Runtime texture path:
-
-`assets/minefluence/textures/billboard/mission_<index>_<route>_<posting>.png`
-
-If the client cannot find a requested billboard texture, the renderer falls back to `assets/minefluence/textures/billboard/default.png`.
+If the expected upload texture is missing, the server logs the requested
+mission, route, posting style, and path, then falls back safely to
+`assets/minefluence/textures/billboard/default.png`. The client renderer also
+falls back to the same default image if a manually selected texture is missing.
 
 ## Posting Integration
 

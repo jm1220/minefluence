@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.jeongmin.modid.MineFluence;
 import net.jeongmin.modid.area.MineFluenceDemoMapPreset;
 import net.jeongmin.modid.config.MineFluenceBalance;
 import net.jeongmin.modid.data.MineFluencePlayerData;
@@ -31,22 +32,8 @@ public final class MineFluenceFanVillagers {
 	private static final String FAN_NAME = "MineFluence Fan";
 	private static final int SEARCH_RADIUS = 80;
 	private static final int SPAWN_VERTICAL_SEARCH = 8;
+	private static final int SPAWN_HORIZONTAL_SEARCH = 5;
 	private static final int POSITION_TARGET_RANGE = 8;
-	private static final int[][] HORIZONTAL_OFFSETS = {
-			{0, 0},
-			{1, 0},
-			{-1, 0},
-			{0, 1},
-			{0, -1},
-			{1, 1},
-			{1, -1},
-			{-1, 1},
-			{-1, -1},
-			{2, 0},
-			{-2, 0},
-			{0, 2},
-			{0, -2}
-	};
 
 	private MineFluenceFanVillagers() {
 	}
@@ -62,11 +49,28 @@ public final class MineFluenceFanVillagers {
 		int targetCount = MineFluenceBalance.getTargetFanCount(data.getFollower());
 		ServerWorld world = player.getServer().getOverworld();
 		List<VillagerEntity> fans = findFans(world);
+		int actualCount = fans.size();
+		MineFluence.LOGGER.info(
+				"[FanVillagers] Sync player={} followers={} expected={} actual={} center={}",
+				player.getName().getString(),
+				data.getFollower(),
+				targetCount,
+				actualCount,
+				MineFluenceDemoMapPreset.fanVillageCenter().toShortString()
+		);
 		int removed = removeExtraFans(fans, targetCount);
 
 		fans = findFans(world);
 		int spawned = spawnMissingFans(world, fans, targetCount);
 		int currentCount = findFans(world).size();
+		MineFluence.LOGGER.info(
+				"[FanVillagers] Sync complete player={} expected={} current={} spawned={} removed={}",
+				player.getName().getString(),
+				targetCount,
+				currentCount,
+				spawned,
+				removed
+		);
 		if (spawned > 0) {
 			MineFluenceDisplay.sendChat(player, "New fans have arrived in the village.");
 		}
@@ -88,6 +92,9 @@ public final class MineFluenceFanVillagers {
 	private static int clearFanVillagers(ServerWorld world) {
 		List<VillagerEntity> fans = findTaggedFans(world);
 		fans.forEach(Entity::discard);
+		if (!fans.isEmpty()) {
+			MineFluence.LOGGER.info("[FanVillagers] Removed {} tagged fan villager(s).", fans.size());
+		}
 		return fans.size();
 	}
 
@@ -152,11 +159,17 @@ public final class MineFluenceFanVillagers {
 	private static boolean spawnFan(ServerWorld world, BlockPos configuredPos, int slot) {
 		VillagerEntity fan = EntityType.VILLAGER.create(world);
 		if (fan == null) {
+			MineFluence.LOGGER.warn("[FanVillagers] Slot {} skipped: villager entity creation returned null.", slot);
 			return false;
 		}
 
 		BlockPos spawnPos = findSafeSpawnPos(world, fan, configuredPos);
 		if (spawnPos == null) {
+			MineFluence.LOGGER.warn(
+					"[FanVillagers] Slot {} skipped: no safe position near configured anchor {}.",
+					slot,
+					configuredPos.toShortString()
+			);
 			return false;
 		}
 
@@ -175,8 +188,19 @@ public final class MineFluenceFanVillagers {
 		fan.setPositionTarget(spawnPos, POSITION_TARGET_RANGE);
 
 		if (!world.isSpaceEmpty(fan) || !world.spawnEntity(fan)) {
+			MineFluence.LOGGER.warn(
+					"[FanVillagers] Slot {} skipped: entity spawn was rejected at {}.",
+					slot,
+					spawnPos.toShortString()
+			);
 			return false;
 		}
+		MineFluence.LOGGER.info(
+				"[FanVillagers] Spawned slot {} at {} with tag {}.",
+				slot,
+				spawnPos.toShortString(),
+				FAN_TAG
+		);
 
 		world.spawnParticles(
 				ParticleTypes.HAPPY_VILLAGER,
@@ -193,21 +217,28 @@ public final class MineFluenceFanVillagers {
 	}
 
 	private static BlockPos findSafeSpawnPos(ServerWorld world, VillagerEntity fan, BlockPos configuredPos) {
-		for (int[] offset : HORIZONTAL_OFFSETS) {
-			int x = configuredPos.getX() + offset[0];
-			int z = configuredPos.getZ() + offset[1];
-			for (int distance = 0; distance <= SPAWN_VERTICAL_SEARCH; distance++) {
-				BlockPos above = new BlockPos(x, configuredPos.getY() + distance, z);
-				if (isSafeSpawnPos(world, fan, above)) {
-					return above;
-				}
-				if (distance == 0) {
-					continue;
-				}
+		for (int radius = 0; radius <= SPAWN_HORIZONTAL_SEARCH; radius++) {
+			for (int offsetX = -radius; offsetX <= radius; offsetX++) {
+				for (int offsetZ = -radius; offsetZ <= radius; offsetZ++) {
+					if (Math.max(Math.abs(offsetX), Math.abs(offsetZ)) != radius) {
+						continue;
+					}
+					int x = configuredPos.getX() + offsetX;
+					int z = configuredPos.getZ() + offsetZ;
+					for (int distance = 0; distance <= SPAWN_VERTICAL_SEARCH; distance++) {
+						BlockPos above = new BlockPos(x, configuredPos.getY() + distance, z);
+						if (isSafeSpawnPos(world, fan, above)) {
+							return above;
+						}
+						if (distance == 0) {
+							continue;
+						}
 
-				BlockPos below = new BlockPos(x, configuredPos.getY() - distance, z);
-				if (isSafeSpawnPos(world, fan, below)) {
-					return below;
+						BlockPos below = new BlockPos(x, configuredPos.getY() - distance, z);
+						if (isSafeSpawnPos(world, fan, below)) {
+							return below;
+						}
+					}
 				}
 			}
 		}

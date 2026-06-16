@@ -75,6 +75,8 @@ public final class MineFluenceDisplay {
 				+ ", Waiting For Posting=" + data.isWaitingForPostingChoice()
 				+ ", Active Mission Progress=" + data.getActiveMissionProgress()
 				+ ", Mission Baseline=" + data.getMissionBaselineValue()
+				+ ", Mission 5 Crafted Composters=" + data.getMission5CraftedComposters()
+				+ ", Mission 5 Placed Composters=" + data.getMission5PlacedComposters()
 				+ ", Active Invasion=" + data.getActiveInvasionIndex()
 				+ ", Last Completed Invasion=" + data.getLastCompletedInvasionIndex()
 				+ ", Tracked Invasion Mobs=" + data.getTrackedInvasionMobCount()

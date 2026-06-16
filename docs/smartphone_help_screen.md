@@ -43,10 +43,11 @@ Mission headings come from `FarmerMissions`, and applicable target counts are re
 
 The content is one scrollable document. Minecraft's `TextRenderer.wrapLines` wraps the UTF-8 Korean text to the current panel width. Mouse-wheel input changes a bounded scroll offset, text is clipped with a scissor rectangle, and a scrollbar indicates the current position. Buttons remain outside the scroll viewport.
 
-The supplied guide wording differed from current gameplay detection in three places, so the displayed help follows the implemented behavior:
+The supplied guide wording differed from current gameplay detection in a few places, so the displayed help follows the implemented behavior:
 
-- Good Mission 3 currently counts two right-click interactions with farmer villagers, not completed trades.
-- Good Mission 4 consumes one held potato per villager right-click; dropping potatoes with Q is not detected.
+- Good Mission 3 requires two completed villager trades. Opening the trade screen does not count.
+- Good Mission 4 consumes one held potato per valid villager right-click; dropping potatoes with Q is not detected.
+- Good Mission 5 tracks composters crafted and successfully placed while the mission is active. Both counters must reach two; the single-number HUD shows placed progress.
 - Good Mission 7 requires one composter in the configured farm-build area. The two-composter/14-slab requirement applies to Good Mission 5.
 - Bad Mission 6 currently completes after one valid farmland/crop block is destroyed in the configured farm area, not after destroying an entire plot.
 

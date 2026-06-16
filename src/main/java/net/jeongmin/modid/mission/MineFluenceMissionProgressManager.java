@@ -73,6 +73,12 @@ public final class MineFluenceMissionProgressManager {
 		};
 	}
 
+	public static void clearPlayerTransientState(ServerPlayerEntity player) {
+		if (player != null) {
+			OPEN_CONTAINER_SNAPSHOTS.remove(player.getUuid());
+		}
+	}
+
 	public static void onFarmlandTrampled(Entity entity, BlockState originalState, World world, BlockPos pos) {
 		if (world == null
 				|| world.isClient()
@@ -149,7 +155,6 @@ public final class MineFluenceMissionProgressManager {
 		return switch (mission.index()) {
 			case 1 -> countBlocksInArea(player.getServer(), MineFluenceAreaType.GARDEN, state -> state.isIn(BlockTags.FLOWERS));
 			case 2 -> countBlocksInArea(player.getServer(), MineFluenceAreaType.FARM, state -> state.isOf(Blocks.WHEAT));
-			case 5 -> countInventoryItems(player, Items.COMPOSTER);
 			case 6 -> countBlocksInArea(player.getServer(), MineFluenceAreaType.SHARED_SPACE, state -> state.isOf(Blocks.HAY_BLOCK));
 			default -> 0;
 		};
@@ -183,6 +188,11 @@ public final class MineFluenceMissionProgressManager {
 					+ ", Farmland " + Math.min(counts.farmland(), MineFluenceBalance.FARMER_MISSION_7_FARMLAND_TARGET) + "/" + MineFluenceBalance.FARMER_MISSION_7_FARMLAND_TARGET
 					+ ", Composter " + Math.min(counts.composter(), MineFluenceBalance.FARMER_MISSION_7_COMPOSTER_TARGET) + "/" + MineFluenceBalance.FARMER_MISSION_7_COMPOSTER_TARGET;
 		}
+		if (mission.index() == 5) {
+			return mission.title() + ": Crafted "
+					+ Math.min(data.getMission5CraftedComposters(), mission.targetProgress()) + "/" + mission.targetProgress()
+					+ ", Placed " + Math.min(data.getMission5PlacedComposters(), mission.targetProgress()) + "/" + mission.targetProgress();
+		}
 
 		return mission.title() + ": " + data.getActiveMissionProgress() + "/" + mission.targetProgress();
 	}
@@ -204,6 +214,11 @@ public final class MineFluenceMissionProgressManager {
 				return mission.title() + " " + data.getActiveMissionProgress() + "/" + mission.targetProgress();
 			}
 			return mission.title() + " debug-only";
+		}
+		if (mission.index() == 5) {
+			return mission.title() + " Crafted "
+					+ Math.min(data.getMission5CraftedComposters(), mission.targetProgress()) + "/" + mission.targetProgress()
+					+ ", Placed " + Math.min(data.getMission5PlacedComposters(), mission.targetProgress()) + "/" + mission.targetProgress();
 		}
 		return mission.title() + " " + data.getActiveMissionProgress() + "/" + mission.targetProgress();
 	}
@@ -230,7 +245,7 @@ public final class MineFluenceMissionProgressManager {
 	}
 
 	private static ActionResult onUseEntity(net.minecraft.entity.player.PlayerEntity player, World world, Hand hand, Entity entity, net.minecraft.util.hit.EntityHitResult hitResult) {
-		if (world.isClient() || hand != Hand.MAIN_HAND || !(player instanceof ServerPlayerEntity serverPlayer)) {
+		if (world.isClient() || !(player instanceof ServerPlayerEntity serverPlayer) || serverPlayer.isSpectator()) {
 			return ActionResult.PASS;
 		}
 
@@ -239,17 +254,11 @@ public final class MineFluenceMissionProgressManager {
 		if (!data.hasActiveMission()
 				|| data.isWaitingForPostingChoice()
 				|| data.getActiveMissionRoute() != MineFluenceMissionRoute.GOOD
-				|| !(entity instanceof VillagerEntity villager)
-				|| MineFluenceFanVillagers.isFan(villager)) {
+				|| !isMissionVillager(entity)) {
 			return ActionResult.PASS;
 		}
 
-		if (data.getActiveMissionIndex() == 3 && villager.getVillagerData().getProfession() == VillagerProfession.FARMER) {
-			incrementEventProgress(serverPlayer, state, data, 1);
-			return ActionResult.PASS;
-		}
-
-		if (data.getActiveMissionIndex() == 4) {
+		if (canProgressActiveGoodMission(data, 4)) {
 			ItemStack stack = serverPlayer.getStackInHand(hand);
 			if (stack.isOf(Items.POTATO)) {
 				stack.decrementUnlessCreative(1, serverPlayer);
@@ -259,6 +268,28 @@ public final class MineFluenceMissionProgressManager {
 		}
 
 		return ActionResult.PASS;
+	}
+
+	public static void onVillagerTradeCompleted(PlayerEntity player, Entity merchantEntity) {
+		if (!(player instanceof ServerPlayerEntity serverPlayer)
+				|| serverPlayer.isSpectator()
+				|| player.getWorld().isClient()
+				|| !isMissionVillager(merchantEntity)) {
+			return;
+		}
+
+		VillagerEntity villager = (VillagerEntity) merchantEntity;
+		if (!isMissionFarmerVillager(villager)) {
+			return;
+		}
+
+		MineFluenceWorldState state = MineFluenceWorldState.get(serverPlayer.getServer());
+		MineFluencePlayerData data = state.getPlayerData(serverPlayer);
+		if (!canProgressActiveGoodMission(data, 3)) {
+			return;
+		}
+
+		incrementEventProgress(serverPlayer, state, data, 1);
 	}
 
 	private static ActionResult onUseBlock(
@@ -288,7 +319,7 @@ public final class MineFluenceMissionProgressManager {
 			return ActionResult.PASS;
 		}
 
-		if (entity instanceof VillagerEntity && !MineFluenceFanVillagers.isFan(entity)) {
+		if (isMissionVillager(entity)) {
 			incrementBadMissionProgress(serverPlayer, 3, 1);
 		}
 		return ActionResult.PASS;
@@ -324,8 +355,7 @@ public final class MineFluenceMissionProgressManager {
 
 	private static void onLivingDeath(LivingEntity entity, DamageSource damageSource) {
 		if (entity.getWorld().isClient()
-				|| !(entity instanceof VillagerEntity)
-				|| MineFluenceFanVillagers.isFan(entity)) {
+				|| !isMissionVillager(entity)) {
 			return;
 		}
 
@@ -335,11 +365,46 @@ public final class MineFluenceMissionProgressManager {
 		}
 	}
 
+	public static void onItemCrafted(PlayerEntity player, ItemStack stack, int amount) {
+		if (!(player instanceof ServerPlayerEntity serverPlayer)
+				|| stack == null
+				|| !stack.isOf(Items.COMPOSTER)
+				|| amount <= 0) {
+			return;
+		}
+
+		MineFluenceWorldState state = MineFluenceWorldState.get(serverPlayer.getServer());
+		MineFluencePlayerData data = state.getPlayerData(serverPlayer);
+		if (!canProgressGoodMission5(data)) {
+			return;
+		}
+
+		data.setMission5CraftedComposters(data.getMission5CraftedComposters() + amount);
+		updateGoodMission5Progress(serverPlayer, state, data);
+	}
+
+	public static void onBlockPlaced(PlayerEntity player, BlockState placedState) {
+		if (!(player instanceof ServerPlayerEntity serverPlayer)
+				|| placedState == null
+				|| !placedState.isOf(Blocks.COMPOSTER)) {
+			return;
+		}
+
+		MineFluenceWorldState state = MineFluenceWorldState.get(serverPlayer.getServer());
+		MineFluencePlayerData data = state.getPlayerData(serverPlayer);
+		if (!canProgressGoodMission5(data)) {
+			return;
+		}
+
+		data.setMission5PlacedComposters(data.getMission5PlacedComposters() + 1);
+		updateGoodMission5Progress(serverPlayer, state, data);
+	}
+
 	private static int scannedProgress(ServerPlayerEntity player, MineFluencePlayerData data) {
 		return switch (data.getActiveMissionIndex()) {
 			case 1 -> countBlocksInArea(player.getServer(), MineFluenceAreaType.GARDEN, state -> state.isIn(BlockTags.FLOWERS)) - data.getMissionBaselineValue();
 			case 2 -> countBlocksInArea(player.getServer(), MineFluenceAreaType.FARM, state -> state.isOf(Blocks.WHEAT)) - data.getMissionBaselineValue();
-			case 5 -> countInventoryItems(player, Items.COMPOSTER) - data.getMissionBaselineValue();
+			case 5 -> -1;
 			case 6 -> countBlocksInArea(player.getServer(), MineFluenceAreaType.SHARED_SPACE, state -> state.isOf(Blocks.HAY_BLOCK)) - data.getMissionBaselineValue();
 			case 7 -> {
 				FarmPlotCounts counts = countFarmPlot(player.getServer());
@@ -396,6 +461,45 @@ public final class MineFluenceMissionProgressManager {
 				&& hasBadGameplayDetection(missionIndex)
 				&& mission.targetProgress() > 0
 				&& data.getActiveMissionProgress() < mission.targetProgress();
+	}
+
+	private static boolean canProgressGoodMission5(MineFluencePlayerData data) {
+		return data.getSelectedJob() == MineFluenceJob.FARMER
+				&& !data.isEndingTriggered()
+				&& data.hasActiveMission()
+				&& !data.isWaitingForPostingChoice()
+				&& data.getActiveMissionRoute() == MineFluenceMissionRoute.GOOD
+				&& data.getActiveMissionIndex() == 5;
+	}
+
+	private static boolean canProgressActiveGoodMission(MineFluencePlayerData data, int missionIndex) {
+		return data.getSelectedJob() == MineFluenceJob.FARMER
+				&& !data.isEndingTriggered()
+				&& data.hasActiveMission()
+				&& !data.isWaitingForPostingChoice()
+				&& data.getActiveMissionRoute() == MineFluenceMissionRoute.GOOD
+				&& data.getActiveMissionIndex() == missionIndex
+				&& data.getActiveMissionProgress() < missionFor(missionIndex, MineFluenceMissionRoute.GOOD).targetProgress();
+	}
+
+	private static void updateGoodMission5Progress(
+			ServerPlayerEntity player,
+			MineFluenceWorldState state,
+			MineFluencePlayerData data
+	) {
+		MineFluenceMission mission = missionFor(5, MineFluenceMissionRoute.GOOD);
+		int target = mission.targetProgress();
+		int visibleProgress = Math.min(data.getMission5PlacedComposters(), target);
+		if (visibleProgress != data.getActiveMissionProgress()) {
+			data.setActiveMissionProgress(visibleProgress);
+		}
+		state.markDirty();
+		MineFluenceHud.refresh(player, data);
+
+		if (data.getMission5CraftedComposters() >= target
+				&& data.getMission5PlacedComposters() >= target) {
+			completeActiveMission(player, state, data, mission);
+		}
 	}
 
 	private static void updateProgress(ServerPlayerEntity player, MineFluenceWorldState state, MineFluencePlayerData data, int rawProgress) {
@@ -490,6 +594,15 @@ public final class MineFluenceMissionProgressManager {
 				|| state.isOf(Blocks.CARROTS)
 				|| state.isOf(Blocks.POTATOES)
 				|| state.isOf(Blocks.BEETROOTS);
+	}
+
+	private static boolean isMissionVillager(Entity entity) {
+		return entity instanceof VillagerEntity;
+	}
+
+	private static boolean isMissionFarmerVillager(VillagerEntity villager) {
+		return villager.getVillagerData().getProfession() == VillagerProfession.FARMER
+				|| MineFluenceFanVillagers.isFan(villager);
 	}
 
 	private static boolean isInsideMissionArea(

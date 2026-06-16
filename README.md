@@ -21,6 +21,11 @@ For playtesting, download the latest `MineFluence_Playtest_Package.zip` from the
 5. Open the `MINEFLUENCE_v1` world.
 6. Use the MineFluence Smartphone in-game to progress through the demo.
 
+Followers produce tagged Fan Villagers by tier, while Social Credibility
+controls tagged Iron Golem support during invasions. MineFluence only applies
+special behavior to `minefluence_fan` and `minefluence_invasion_support`
+entities; normal villagers and Iron Golems keep vanilla behavior.
+
 ## Build from source
 
 Windows:

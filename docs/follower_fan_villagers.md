@@ -20,18 +20,22 @@ The placeholder balance tiers are stored in `MineFluenceBalance`:
 
 The fixed Overworld coordinates are stored in `MineFluenceDemoMapPreset`:
 
-1. `(-2, -60, 8)`
-2. `(2, -60, 8)`
-3. `(6, -60, 12)`
-4. `(10, -60, 16)`
-5. `(14, -60, 20)`
-6. `(18, -60, 24)`
-7. `(22, -60, 20)`
-8. `(18, -60, 12)`
-9. `(10, -60, 4)`
-10. `(4, -60, 2)`
+1. `(-858, 65, 719)`
+2. `(-854, 65, 719)`
+3. `(-850, 65, 723)`
+4. `(-846, 65, 727)`
+5. `(-842, 65, 731)`
+6. `(-838, 65, 735)`
+7. `(-834, 65, 731)`
+8. `(-838, 65, 723)`
+9. `(-846, 65, 715)`
+10. `(-852, 65, 713)`
 
-The search center is `(10, -60, 15)` with an 80-block radius. Before spawning, the manager checks nearby horizontal offsets and up to eight blocks above or below the configured Y for solid ground, free feet/head blocks, and entity collision space.
+The search center is `(-846, 65, 726)` with an 80-block radius. These points
+preserve the original relative fan layout around the current demo village.
+Before spawning, the manager checks a deterministic five-block horizontal
+radius and up to eight blocks above or below the configured Y for solid ground,
+free feet/head blocks, and entity collision space.
 
 ## Identity And Persistence
 
@@ -75,13 +79,17 @@ Normal villagers and all other entities are untouched.
 
 ## Mission Interaction
 
-Fan villagers are excluded from:
+Fan villagers count as valid villagers for villager-based mission objectives
+while still being constrained to actual `VillagerEntity` instances. The
+`minefluence_fan` tag does not make non-villager entities valid mission
+targets.
 
-- Good Mission 3 and Good Mission 4 villager interaction progress
+They are accepted by:
+
+- Good Mission 3 completed farmer-villager trade progress
+- Good Mission 4 potato giveaway villager interaction progress
 - Bad Mission 3 villager hit progress
 - Bad Mission 7 villager kill progress
-
-This keeps fans as social feedback rather than mission targets.
 
 ## Testing Commands
 
@@ -97,3 +105,6 @@ The existing follower debug commands also synchronize fans automatically.
 - No fan UUID registry is stored in persistent state.
 - Fans use vanilla villager appearance and AI; the custom name and tags are their current distinction.
 - Spawn coordinates and tiers are placeholders for the current fixed demo map.
+- Concise server logs report each sync's follower value, expected count, actual
+  tagged count, spawned count, removed count, and any slot that has no safe
+  position.

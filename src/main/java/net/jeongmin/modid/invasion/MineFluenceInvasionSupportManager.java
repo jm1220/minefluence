@@ -6,7 +6,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.jeongmin.modid.MineFluence;
 import net.jeongmin.modid.area.MineFluenceDemoMapPreset;
 import net.jeongmin.modid.config.MineFluenceBalance;
 import net.jeongmin.modid.data.MineFluencePlayerData;
@@ -17,7 +20,10 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.passive.IronGolemEntity;
+import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -32,27 +38,24 @@ public final class MineFluenceInvasionSupportManager {
 	private static final String SUPPORT_NAME = "MineFluence Defender";
 	private static final int SEARCH_RADIUS = 96;
 	private static final int SPAWN_VERTICAL_SEARCH = 8;
+	private static final int SPAWN_HORIZONTAL_SEARCH = 5;
 	private static final int POSITION_TARGET_RANGE = 24;
-	private static final int[][] HORIZONTAL_OFFSETS = {
-			{0, 0},
-			{1, 0},
-			{-1, 0},
-			{0, 1},
-			{0, -1},
-			{1, 1},
-			{1, -1},
-			{-1, 1},
-			{-1, -1},
-			{2, 0},
-			{-2, 0},
-			{0, 2},
-			{0, -2}
-	};
+	private static final int FRIENDLY_TARGET_CHECK_INTERVAL = 10;
 
 	private MineFluenceInvasionSupportManager() {
 	}
 
 	public static void register() {
+		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
+			if (entity instanceof IronGolemEntity ally
+					&& isSupportAlly(ally)
+					&& source.getAttacker() instanceof PlayerEntity) {
+				clearAggro(ally);
+				return false;
+			}
+			return true;
+		});
+		ServerTickEvents.END_SERVER_TICK.register(MineFluenceInvasionSupportManager::tickFriendlyTargetSafety);
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			ServerPlayerEntity player = handler.player;
 			MineFluencePlayerData data = MineFluenceWorldState.get(server).getPlayerData(player);
@@ -65,7 +68,16 @@ public final class MineFluenceInvasionSupportManager {
 	}
 
 	public static SpawnResult spawnForInvasion(ServerPlayerEntity player, MineFluencePlayerData data) {
-		SpawnResult result = spawnTargetCount(player, MineFluenceBalance.getInvasionSupportCount(data.getSocialCredibility()));
+		int targetCount = MineFluenceBalance.getInvasionSupportCount(data.getSocialCredibility());
+		MineFluence.LOGGER.info(
+				"[InvasionSupport] Spawn requested player={} invasion={} social={} expected={}",
+				player.getName().getString(),
+				data.getActiveInvasionIndex(),
+				data.getSocialCredibility(),
+				targetCount
+		);
+		SyncResult syncResult = reconcileTargetCount(player, targetCount, "invasion_start");
+		SpawnResult result = new SpawnResult(targetCount, syncResult.spawnedCount());
 		if (result.targetCount() <= 0) {
 			MineFluenceDisplay.sendChat(player, "The village does not trust you enough to help.");
 		} else if (result.spawnedCount() > 0) {
@@ -79,23 +91,22 @@ public final class MineFluenceInvasionSupportManager {
 	public static SpawnResult spawnForTesting(ServerPlayerEntity player) {
 		MineFluencePlayerData data = MineFluenceWorldState.get(player.getServer()).getPlayerData(player);
 		clearSupportAllies(player);
-		return spawnTargetCount(player, MineFluenceBalance.getInvasionSupportCount(data.getSocialCredibility()));
+		int targetCount = MineFluenceBalance.getInvasionSupportCount(data.getSocialCredibility());
+		SyncResult result = reconcileTargetCount(player, targetCount, "debug_spawn");
+		return new SpawnResult(targetCount, result.spawnedCount());
 	}
 
 	public static SyncResult syncSupportAllies(ServerPlayerEntity player, MineFluencePlayerData data) {
 		int targetCount = MineFluenceBalance.getInvasionSupportCount(data.getSocialCredibility());
-		ServerWorld world = player.getServer().getOverworld();
-		List<IronGolemEntity> allies = findLivingSupportAllies(world);
-		int removed = removeExtraAllies(allies, targetCount);
-
-		allies = findLivingSupportAllies(world);
-		int spawned = spawnMissingAllies(world, allies, targetCount);
-		return new SyncResult(findLivingSupportAllies(world).size(), targetCount, spawned, removed);
+		return reconcileTargetCount(player, targetCount, "sync");
 	}
 
 	public static int clearSupportAllies(ServerPlayerEntity player) {
 		List<IronGolemEntity> allies = findTaggedSupportAllies(player.getServer().getOverworld());
 		allies.forEach(Entity::discard);
+		if (!allies.isEmpty()) {
+			MineFluence.LOGGER.info("[InvasionSupport] Removed {} tagged support ally/allies.", allies.size());
+		}
 		return allies.size();
 	}
 
@@ -119,11 +130,12 @@ public final class MineFluenceInvasionSupportManager {
 		}
 
 		List<LivingEntity> invaders = findActiveInvaders(world, data);
-		if (invaders.isEmpty()) {
-			return;
-		}
-
 		for (IronGolemEntity ally : allies) {
+			clearFriendlyTarget(player.getServer(), ally);
+			if (invaders.isEmpty()) {
+				continue;
+			}
+
 			LivingEntity currentTarget = ally.getTarget();
 			if (currentTarget != null && MineFluenceInvasionManager.isActiveTrackedInvader(data, currentTarget)) {
 				continue;
@@ -138,10 +150,76 @@ public final class MineFluenceInvasionSupportManager {
 		}
 	}
 
-	private static SpawnResult spawnTargetCount(ServerPlayerEntity player, int targetCount) {
+	private static void tickFriendlyTargetSafety(MinecraftServer server) {
+		if (server.getTicks() % FRIENDLY_TARGET_CHECK_INTERVAL != 0) {
+			return;
+		}
+
+		for (IronGolemEntity ally : findLivingSupportAllies(server.getOverworld())) {
+			clearFriendlyTarget(server, ally);
+		}
+	}
+
+	private static void clearFriendlyTarget(MinecraftServer server, IronGolemEntity ally) {
+		LivingEntity target = ally.getTarget();
+		boolean hasFriendlyTarget = target instanceof PlayerEntity || target instanceof VillagerEntity;
+		boolean angryAtPlayer = ally.getAngryAt() != null
+				&& server.getPlayerManager().getPlayer(ally.getAngryAt()) != null;
+		if (hasFriendlyTarget || angryAtPlayer) {
+			clearAggro(ally);
+		}
+	}
+
+	private static void clearAggro(IronGolemEntity ally) {
+		ally.setTarget(null);
+		ally.setAttacker(null);
+		ally.stopAnger();
+		ally.getNavigation().stop();
+	}
+
+	private static SyncResult reconcileTargetCount(ServerPlayerEntity player, int targetCount, String reason) {
 		ServerWorld world = player.getServer().getOverworld();
-		int spawned = spawnMissingAllies(world, List.of(), targetCount);
-		return new SpawnResult(targetCount, spawned);
+		List<IronGolemEntity> allies = findLivingSupportAllies(world);
+		int actualCount = allies.size();
+		MineFluence.LOGGER.info(
+				"[InvasionSupport] Reconcile reason={} player={} expected={} actual={} center={}",
+				reason,
+				player.getName().getString(),
+				targetCount,
+				actualCount,
+				MineFluenceDemoMapPreset.villageCenter().toShortString()
+		);
+		if (targetCount <= 0) {
+			int removed = removeExtraAllies(allies, 0);
+			MineFluence.LOGGER.info(
+					"[InvasionSupport] Spawn skipped reason={} because Social Credibility tier expects no allies; removed={}.",
+					reason,
+					removed
+			);
+			return new SyncResult(0, targetCount, 0, removed);
+		}
+
+		int removed = removeExtraAllies(allies, targetCount);
+		allies = findLivingSupportAllies(world);
+		int spawned = spawnMissingAllies(world, allies, targetCount);
+		int currentCount = findLivingSupportAllies(world).size();
+		if (spawned == 0 && currentCount >= targetCount) {
+			MineFluence.LOGGER.info(
+					"[InvasionSupport] Spawn skipped reason={} because {} tagged ally/allies already satisfy target {}.",
+					reason,
+					currentCount,
+					targetCount
+			);
+		}
+		MineFluence.LOGGER.info(
+				"[InvasionSupport] Reconcile complete reason={} expected={} current={} spawned={} removed={}",
+				reason,
+				targetCount,
+				currentCount,
+				spawned,
+				removed
+		);
+		return new SyncResult(currentCount, targetCount, spawned, removed);
 	}
 
 	private static List<LivingEntity> findActiveInvaders(
@@ -219,11 +297,17 @@ public final class MineFluenceInvasionSupportManager {
 	private static boolean spawnAlly(ServerWorld world, BlockPos configuredPos, int slot) {
 		IronGolemEntity ally = EntityType.IRON_GOLEM.create(world);
 		if (ally == null) {
+			MineFluence.LOGGER.warn("[InvasionSupport] Slot {} skipped: iron golem entity creation returned null.", slot);
 			return false;
 		}
 
 		BlockPos spawnPos = findSafeSpawnPos(world, ally, configuredPos);
 		if (spawnPos == null) {
+			MineFluence.LOGGER.warn(
+					"[InvasionSupport] Slot {} skipped: no safe position near configured anchor {}.",
+					slot,
+					configuredPos.toShortString()
+			);
 			return false;
 		}
 
@@ -243,8 +327,19 @@ public final class MineFluenceInvasionSupportManager {
 		ally.setPositionTarget(spawnPos, POSITION_TARGET_RANGE);
 
 		if (!world.isSpaceEmpty(ally) || !world.spawnEntity(ally)) {
+			MineFluence.LOGGER.warn(
+					"[InvasionSupport] Slot {} skipped: entity spawn was rejected at {}.",
+					slot,
+					spawnPos.toShortString()
+			);
 			return false;
 		}
+		MineFluence.LOGGER.info(
+				"[InvasionSupport] Spawned slot {} at {} with tag {}.",
+				slot,
+				spawnPos.toShortString(),
+				SUPPORT_TAG
+		);
 
 		world.spawnParticles(
 				ParticleTypes.HAPPY_VILLAGER,
@@ -261,21 +356,28 @@ public final class MineFluenceInvasionSupportManager {
 	}
 
 	private static BlockPos findSafeSpawnPos(ServerWorld world, IronGolemEntity ally, BlockPos configuredPos) {
-		for (int[] offset : HORIZONTAL_OFFSETS) {
-			int x = configuredPos.getX() + offset[0];
-			int z = configuredPos.getZ() + offset[1];
-			for (int distance = 0; distance <= SPAWN_VERTICAL_SEARCH; distance++) {
-				BlockPos above = new BlockPos(x, configuredPos.getY() + distance, z);
-				if (isSafeSpawnPos(world, ally, above)) {
-					return above;
-				}
-				if (distance == 0) {
-					continue;
-				}
+		for (int radius = 0; radius <= SPAWN_HORIZONTAL_SEARCH; radius++) {
+			for (int offsetX = -radius; offsetX <= radius; offsetX++) {
+				for (int offsetZ = -radius; offsetZ <= radius; offsetZ++) {
+					if (Math.max(Math.abs(offsetX), Math.abs(offsetZ)) != radius) {
+						continue;
+					}
+					int x = configuredPos.getX() + offsetX;
+					int z = configuredPos.getZ() + offsetZ;
+					for (int distance = 0; distance <= SPAWN_VERTICAL_SEARCH; distance++) {
+						BlockPos above = new BlockPos(x, configuredPos.getY() + distance, z);
+						if (isSafeSpawnPos(world, ally, above)) {
+							return above;
+						}
+						if (distance == 0) {
+							continue;
+						}
 
-				BlockPos below = new BlockPos(x, configuredPos.getY() - distance, z);
-				if (isSafeSpawnPos(world, ally, below)) {
-					return below;
+						BlockPos below = new BlockPos(x, configuredPos.getY() - distance, z);
+						if (isSafeSpawnPos(world, ally, below)) {
+							return below;
+						}
+					}
 				}
 			}
 		}

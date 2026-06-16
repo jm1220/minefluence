@@ -4,6 +4,7 @@ import net.fabricmc.api.ModInitializer;
 import net.jeongmin.modid.area.MineFluenceAreaGuideManager;
 import net.jeongmin.modid.billboard.MineFluenceBillboards;
 import net.jeongmin.modid.command.MineFluenceCommands;
+import net.jeongmin.modid.core.MineFluencePlayerDeathManager;
 import net.jeongmin.modid.entity.MineFluenceEntities;
 import net.jeongmin.modid.fan.MineFluenceFanVillagers;
 import net.jeongmin.modid.invasion.MineFluenceInvasionManager;
@@ -36,6 +37,7 @@ public class MineFluence implements ModInitializer {
 		MineFluenceInvasionSupportManager.register();
 		MineFluenceInvasionManager.register();
 		MineFluenceMissionProgressManager.register();
+		MineFluencePlayerDeathManager.register();
 		MineFluenceAreaGuideManager.register();
 		LOGGER.info("MineFluence initialized.");
 	}

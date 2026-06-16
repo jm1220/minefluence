@@ -1,6 +1,7 @@
 package net.jeongmin.modid.item;
 
 import net.jeongmin.modid.MineFluence;
+import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -24,8 +25,32 @@ public final class MineFluenceItems {
 	}
 
 	public static void ensureSingleSmartphone(ServerPlayerEntity player) {
-		removeSmartphones(player);
-		player.giveItemStack(new ItemStack(SMARTPHONE));
+		PlayerInventory inventory = player.getInventory();
+		boolean foundSmartphone = false;
+		for (int slot = 0; slot < inventory.size(); slot++) {
+			ItemStack stack = inventory.getStack(slot);
+			if (!stack.isOf(SMARTPHONE)) {
+				continue;
+			}
+			if (!foundSmartphone) {
+				stack.setCount(1);
+				foundSmartphone = true;
+			} else {
+				inventory.setStack(slot, ItemStack.EMPTY);
+			}
+		}
+		if (foundSmartphone) {
+			inventory.markDirty();
+			return;
+		}
+
+		ItemStack smartphone = new ItemStack(SMARTPHONE);
+		if (!player.giveItemStack(smartphone)) {
+			ItemEntity droppedPhone = player.dropItem(smartphone, false);
+			if (droppedPhone != null) {
+				droppedPhone.setOwner(player.getUuid());
+			}
+		}
 		player.getInventory().markDirty();
 	}
 

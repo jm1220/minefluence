@@ -3,11 +3,14 @@
 	"package": "net.jeongmin.modid.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
+		"BlockItemPlaceMixin",
 		"DoubleInventoryAccessor",
 		"ExampleMixin",
 		"FarmlandBlockMixin",
 		"GenericContainerScreenHandlerMixin",
-		"PlayerEntityAttackMixin"
+		"ItemStackCraftMixin",
+		"PlayerEntityAttackMixin",
+		"TradeOutputSlotMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

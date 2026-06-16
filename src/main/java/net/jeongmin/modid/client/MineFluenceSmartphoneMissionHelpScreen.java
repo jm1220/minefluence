@@ -164,7 +164,8 @@ public class MineFluenceSmartphoneMissionHelpScreen extends Screen {
 		), y, maxWidth);
 		y = addMission(goodMissions.get(4), List.of(
 				"농부 직업 블록인 퇴비통(Composter) "
-						+ goodMissions.get(4).targetProgress() + "개를 제작해 인벤토리에 넣으세요.",
+						+ goodMissions.get(4).targetProgress() + "개를 제작한 뒤 직접 설치하세요.",
+				"미션이 활성화된 동안 제작한 퇴비통과 설치한 퇴비통만 각각 집계되며, 두 조건을 모두 채워야 완료됩니다.",
 				"조합대에서 나무 반블록 7개를 U자 모양으로 배치하면 퇴비통 1개를 만들 수 있습니다.",
 				"퇴비통 2개에는 나무 반블록 14개가 필요하며, 나무판자 6개(원목 약 2개)로 만들 수 있습니다."
 		), y, maxWidth);

@@ -515,11 +515,8 @@ public final class MineFluenceCommands {
 		ServerCommandSource source = context.getSource();
 		ServerPlayerEntity player = source.getPlayerOrThrow();
 		MineFluenceWorldState state = MineFluenceWorldState.get(source.getServer());
-		MineFluencePlayerData currentData = state.getPlayerData(player);
-		MineFluenceInvasionManager.clearInvasionForReset(player, currentData);
-		MineFluenceFanVillagers.clearFanVillagers(player);
+		MineFluenceDemoFlow.resetStartedDemoProgress(player);
 		MineFluencePlayerData data = state.updatePlayerData(player, playerData -> {
-			playerData.resetForDemoStart();
 			playerData.setSelectedJob(MineFluenceJob.FARMER);
 		});
 		MineFluenceWeaponManager.updateWeapon(player, data);
@@ -948,15 +945,9 @@ public final class MineFluenceCommands {
 	private static int resetStats(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
 		ServerCommandSource source = context.getSource();
 		ServerPlayerEntity player = source.getPlayerOrThrow();
-		MineFluenceWorldState state = MineFluenceWorldState.get(source.getServer());
-		MineFluencePlayerData currentData = state.getPlayerData(player);
-		MineFluenceInvasionManager.clearInvasionForReset(player, currentData);
-		MineFluenceFanVillagers.clearFanVillagers(player);
-		MineFluencePlayerData data = state.resetPlayerData(player);
-		MineFluenceFanVillagers.syncFanVillagers(player);
-		MineFluenceWeaponManager.updateWeapon(player, data);
-		MineFluenceDisplay.sendChat(source, "Stats reset. " + shortStats(data));
-		MineFluenceDisplay.sendStatusActionBar(player, data);
+		MineFluencePlayerData data = MineFluenceDemoFlow.resetDemoProgress(player);
+		MineFluenceItems.ensureSingleSmartphone(player);
+		MineFluenceDisplay.sendChat(source, "Demo reset to Tutorial start. " + shortStats(data));
 		return 1;
 	}
 

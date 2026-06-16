@@ -54,6 +54,10 @@ Player commands:
 
 The not-started smartphone screen opens the tutorial as the player-facing start path. `/minefluence start` still performs the existing command-based demo reset/start behavior.
 
+Player death returns the demo to this not-started state. After respawn, use the
+smartphone to replay the tutorial and begin a fresh run. Dropped-item cleanup is
+performed by the map command block setup, not by the mod.
+
 ## Play Behavior
 
 On the final page of the first-time tutorial, Play sends `MineFluenceTutorialPlayPayload` to the server. If the demo has not started, the server calls the existing demo-start service and then the shared Farmer-selection flow. The client does not mutate player data directly.

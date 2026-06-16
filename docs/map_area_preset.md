@@ -12,6 +12,10 @@ Preset coordinates are stored in:
 
 The preset dimension is `minecraft:overworld`. The previous preset near the origin was replaced.
 
+The shared village center used by Followers-based fan villagers and invasion
+support allies is `(-846,65,726)`. Their spawn slots are arranged around that
+center and use the same current-map coordinate region as the mission areas.
+
 Fixed areas:
 
 - `garden`: corners=`(-827,65,723)` and `(-839,65,711)`, stored min=`(-839,62,711)`, max=`(-827,71,723)`

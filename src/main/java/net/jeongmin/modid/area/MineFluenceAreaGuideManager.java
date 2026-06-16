@@ -39,6 +39,12 @@ public final class MineFluenceAreaGuideManager {
 		return MineFluenceMissionAreas.getAreaForMission(route, missionIndex);
 	}
 
+	public static void clearGuide(ServerPlayerEntity player) {
+		if (player != null) {
+			ACTIVE_GUIDES.remove(player.getUuid());
+		}
+	}
+
 	public static void sendMissionAreaHint(ServerPlayerEntity player, int missionIndex, MineFluenceMissionRoute route) {
 		MineFluenceAreaType areaType = requiredAreaForMission(missionIndex, route);
 		if (areaType == null) {
