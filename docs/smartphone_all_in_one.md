@@ -55,7 +55,7 @@ The phone action IDs are:
 - `MineFluencePostingService.postMission`
 - `MineFluenceAreaGuideManager.showArea`
 - `MineFluenceInvasionManager` and `MineFluenceInvasionSupportManager` status queries
-- `MineFluenceEndingVideoLauncher`
+- `EndingVideoScreen`
 
 The mission board, upload screen, and first-time tutorial completion also request a refreshed phone snapshot after their server action completes. Help replay is client-only and does not change player data.
 
@@ -77,7 +77,10 @@ The server includes the configured area type for an active mission. `Show Missio
 
 ## Ending Video
 
-`Play Ending Video` is shown only for an ending recognized as The Famous Villain. It uses the existing external video launcher. Missing files or unsupported Desktop API access produce a safe failure message instead of crashing.
+`Play Ending Video` is shown only for an ending recognized as The Famous
+Villain. It replays the same in-game PNG frame sequence used by the automatic
+ending trigger: 169 frames, 10 fps, 640x360, no audio. Missing frame resources
+show a safe in-screen fallback message instead of crashing.
 
 ## Rendering
 
@@ -98,4 +101,6 @@ The old `M` key mission-board shortcut is no longer registered.
 
 The smartphone snapshot is refreshed on demand and immediately after phone, mission-board, upload, and tutorial actions. Gameplay events such as mission completion and invasion cleanup continue updating the existing HUD; reopening or refreshing the smartphone reads their latest server state without forcing a screen open during combat.
 
-Ending video playback remains external rather than embedded in Minecraft. Long objectives are wrapped and may be clipped at extremely small GUI dimensions, while status and the next action are prioritized.
+Ending video playback is embedded in Minecraft through `EndingVideoScreen`.
+Long objectives are wrapped and may be clipped at extremely small GUI
+dimensions, while status and the next action are prioritized.

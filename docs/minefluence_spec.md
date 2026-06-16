@@ -164,7 +164,7 @@ This creates a 3 x 3 matrix of endings.
 
 Ending thresholds may be temporary for the demo, but should be centralized in the balance/config class. The ending system should be designed with a future-friendly `EndingRegistry` and `EndingType` style structure so video or image assets can be attached later.
 
-Ending video assets are handled as real files on disk for demo playback. Do not implement in-game MP4 rendering; endings can use chat, title, actionbar output, and simple external OS video launch where needed.
+Ending video playback does not decode MP4 inside Minecraft. The Famous Villain demo ending uses packaged PNG frames for in-game playback, while other endings can use chat, title, actionbar output, or future image/video assets.
 
 ## UI Strategy
 

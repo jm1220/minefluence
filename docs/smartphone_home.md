@@ -59,7 +59,7 @@ The home screen does not replace the detailed screens:
 ## Current Limitations
 
 - The phone uses vanilla buttons and text panels only.
-- The phone does not render MP4 inside Minecraft; ending video playback remains external OS playback.
+- The phone does not decode MP4 inside Minecraft. The Famous Villain ending video replays through the in-game PNG frame sequence screen.
 - The phone cannot complete mission objectives directly. Area missions still require the player to perform the existing gameplay actions.
 - Bad mission detection remains whatever the existing mission system supports.
 - The phone shows rough Lie Risk only, not exact Lie Value.

@@ -1,36 +1,49 @@
-# External Ending Video Playback
+# Ending Video Playback
 
-This version does not play MP4 video inside Minecraft.
+The Famous Villain ending now plays in-game using a PNG frame sequence. MineFluence
+does not decode MP4 video inside Minecraft and does not require FFmpeg, VLC,
+JCodec, or native video dependencies.
 
-For The Famous Villain ending, MineFluence launches the MP4 with the operating system default video player using Java `Desktop.open`.
+## Frame Assets
 
-## Demo File Location
+Frames are packaged at:
 
-Copy the video file to:
+`src/main/resources/assets/minefluence/textures/ending/the_famous_villain/`
 
-`run/minefluence_videos/the_famous_villain.mp4`
+Current playback asset settings:
 
-Reason: `Desktop.open` needs a real file on disk. Files packaged inside a mod jar may not behave like normal files.
+- 169 frames
+- `frame_0000.png` through `frame_0168.png`
+- 10 fps
+- 640x360
+- No audio
 
-The development fallback path is:
+The in-game texture identifiers use:
 
-`src/main/resources/assets/minefluence/textures/billboard/ending/the_famous_villain.mp4`
+`minefluence:textures/ending/the_famous_villain/frame_0000.png`
 
-## Testing
+through:
 
-Use:
+`minefluence:textures/ending/the_famous_villain/frame_0168.png`
 
-`/minefluence ending video_test`
+## Playback Flow
 
-or:
+When The Famous Villain ending is triggered, the server keeps the normal ending
+state update and sends `minefluence:play_ending_video` to the client. The client
+opens `EndingVideoScreen`, which renders the frames full-screen with black
+letterboxing/pillarboxing as needed.
 
-`/minefluence ending video_test the_famous_villain`
+The smartphone `Play Ending Video` button sends the existing phone action to the
+server. If the current ending is The Famous Villain, the server sends the same
+`minefluence:play_ending_video` packet so playback restarts from frame 0000.
 
-Both commands attempt to launch `the_famous_villain.mp4` externally.
+`/minefluence ending video_test` also uses this in-game packet for quick manual
+testing.
 
-## Common Issues
+## Missing Frames
 
-- The file is missing from `run/minefluence_videos/the_famous_villain.mp4`.
-- The OS has no default MP4 player installed.
-- Java `Desktop` or `Desktop.Action.OPEN` is not supported in the current environment.
-- Dedicated/headless server environments may not be able to open desktop applications.
+If a frame is missing from the loaded resource pack, playback does not crash.
+The screen shows the missing frame path and logs a warning once for that frame.
+
+The old MP4 file under `textures/billboard/ending/` is not used by the in-game
+ending playback path.

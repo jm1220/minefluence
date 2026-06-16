@@ -12,7 +12,6 @@ import net.jeongmin.modid.data.MineFluenceWorldState;
 import net.jeongmin.modid.ending.MineFluenceEnding;
 import net.jeongmin.modid.ending.MineFluenceEndingManager;
 import net.jeongmin.modid.ending.MineFluenceEndingRegistry;
-import net.jeongmin.modid.ending.MineFluenceEndingVideoLauncher;
 import net.jeongmin.modid.invasion.MineFluenceInvasionManager;
 import net.jeongmin.modid.invasion.MineFluenceInvasionSupportManager;
 import net.jeongmin.modid.mission.MineFluenceMission;
@@ -40,6 +39,7 @@ public final class MineFluenceNetworking {
 		PayloadTypeRegistry.playS2C().register(MineFluenceHudStatePayload.ID, MineFluenceHudStatePayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(MineFluenceMissionBoardResponsePayload.ID, MineFluenceMissionBoardResponsePayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(MineFluencePhoneStateResponsePayload.ID, MineFluencePhoneStateResponsePayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(MineFluencePlayEndingVideoPayload.ID, MineFluencePlayEndingVideoPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(MineFluenceTutorialOpenPayload.ID, MineFluenceTutorialOpenPayload.CODEC);
 
 		ServerPlayNetworking.registerGlobalReceiver(MineFluenceMissionBoardRequestPayload.ID, (payload, context) -> sendMissionBoard(context.player()));
@@ -88,6 +88,15 @@ public final class MineFluenceNetworking {
 		}
 
 		ServerPlayNetworking.send(player, new MineFluenceTutorialOpenPayload());
+		return true;
+	}
+
+	public static boolean playEndingVideo(ServerPlayerEntity player) {
+		if (!ServerPlayNetworking.canSend(player, MineFluencePlayEndingVideoPayload.ID)) {
+			return false;
+		}
+
+		ServerPlayNetworking.send(player, new MineFluencePlayEndingVideoPayload());
 		return true;
 	}
 
@@ -223,7 +232,11 @@ public final class MineFluenceNetworking {
 			case POST_EXAGGERATE -> postMissionFromPhone(player, data, true);
 			case SHOW_MISSION_AREA -> showActiveMissionArea(player);
 			case SHOW_INVASION_STATUS -> showInvasionStatus(player, data);
-			case PLAY_ENDING_VIDEO -> playEndingVideo(player);
+			case PLAY_ENDING_VIDEO -> {
+				if (playEndingVideoFromPhone(player)) {
+					return false;
+				}
+			}
 			case RESTART_DEMO -> {
 				if (!data.isEndingTriggered()) {
 					MineFluenceDisplay.sendChat(player, "Restart Demo is available after an ending.");
@@ -297,21 +310,23 @@ public final class MineFluenceNetworking {
 				+ ": " + remaining + " enemies remaining, " + supportAllies + " support allies.");
 	}
 
-	private static void playEndingVideo(ServerPlayerEntity player) {
+	private static boolean playEndingVideoFromPhone(ServerPlayerEntity player) {
 		MineFluencePlayerData data = MineFluenceWorldState.get(player.getServer()).getPlayerData(player);
 		if (!data.isEndingTriggered()) {
 			MineFluenceDisplay.sendChat(player, "No ending video is available yet.");
-			return;
+			return false;
 		}
 
 		MineFluenceEnding ending = MineFluenceEndingRegistry.getById(data.getEndingId()).orElseGet(() -> MineFluenceEndingManager.getEnding(data));
 		if (!MineFluenceEndingManager.isTheFamousVillainEnding(ending)) {
 			MineFluenceDisplay.sendChat(player, "Ending video could not be opened.");
-			return;
+			return false;
 		}
-		if (!MineFluenceEndingVideoLauncher.launchTheFamousVillain(player)) {
+		if (!playEndingVideo(player)) {
 			MineFluenceDisplay.sendChat(player, "Ending video could not be opened.");
+			return false;
 		}
+		return true;
 	}
 
 	private static MineFluencePhoneStateResponsePayload phoneStatePayload(

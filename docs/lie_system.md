@@ -44,7 +44,7 @@ Exposure does the following:
 - Marks the ending as triggered so normal ending selection cannot overwrite it.
 - Clears active mission and invasion state.
 - Shows dramatic messages to the player.
-- Attempts to launch the existing `the_famous_villain.mp4` ending video through the existing safe video launcher.
+- Sends the in-game The Famous Villain PNG frame-sequence video packet to the client.
 
 If the video file is missing or the desktop video launcher is unavailable, the launcher warns the player and does not crash.
 

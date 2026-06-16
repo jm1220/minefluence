@@ -30,7 +30,6 @@ import net.jeongmin.modid.data.MineFluenceWorldState;
 import net.jeongmin.modid.ending.MineFluenceEnding;
 import net.jeongmin.modid.ending.MineFluenceEndingManager;
 import net.jeongmin.modid.ending.MineFluenceEndingTier;
-import net.jeongmin.modid.ending.MineFluenceEndingVideoLauncher;
 import net.jeongmin.modid.fan.MineFluenceFanVillagers;
 import net.jeongmin.modid.fan.MineFluenceFanVillagers.SyncResult;
 import net.jeongmin.modid.invasion.MineFluenceInvasionManager;
@@ -887,7 +886,7 @@ public final class MineFluenceCommands {
 
 	private static int testEndingVideo(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
 		ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
-		return MineFluenceEndingVideoLauncher.launchTheFamousVillain(player) ? 1 : 0;
+		return MineFluenceNetworking.playEndingVideo(player) ? 1 : 0;
 	}
 
 	private static int triggerEndingDebug(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {

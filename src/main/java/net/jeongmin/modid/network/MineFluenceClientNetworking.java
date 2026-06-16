@@ -1,6 +1,7 @@
 package net.jeongmin.modid.network;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.jeongmin.modid.client.MineFluenceClientEndingVideoHandler;
 import net.jeongmin.modid.client.MineFluenceHudState;
 import net.jeongmin.modid.client.MineFluenceMissionScreen;
 import net.jeongmin.modid.client.MineFluenceMissionClientState;
@@ -26,6 +27,9 @@ public final class MineFluenceClientNetworking {
 		);
 		ClientPlayNetworking.registerGlobalReceiver(MineFluenceTutorialOpenPayload.ID, (payload, context) ->
 				context.client().setScreen(new MineFluenceTutorialScreen())
+		);
+		ClientPlayNetworking.registerGlobalReceiver(MineFluencePlayEndingVideoPayload.ID, (payload, context) ->
+				MineFluenceClientEndingVideoHandler.playTheFamousVillain(context.client())
 		);
 	}
 

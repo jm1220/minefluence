@@ -73,7 +73,7 @@ This plan intentionally avoids gameplay implementation for the current documenta
 - Add Social Credibility low/mid/high tier calculation.
 - Combine both tiers into 9 endings.
 - Prefer an `EndingType` and `EndingRegistry` style structure so future video/image assets can attach cleanly.
-- Do not implement in-game MP4 playback in the demo MVP; use external OS video launch only when needed.
+- Do not implement in-game MP4 decoding in the demo MVP; The Famous Villain uses PNG frame-sequence playback in Minecraft.
 
 ## 10. Basic UI Feedback
 

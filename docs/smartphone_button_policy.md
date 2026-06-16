@@ -62,4 +62,4 @@ The MineFluence `M` keybind registration was removed. `M` no longer opens the mi
 
 - Slash commands remain available as demo/debug fallbacks.
 - The smartphone is snapshot-based. Reopening it requests current server state, and server actions send a refreshed snapshot.
-- Ending video playback remains external.
+- Ending video playback uses the in-game The Famous Villain PNG frame sequence screen.

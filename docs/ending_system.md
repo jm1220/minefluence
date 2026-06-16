@@ -37,10 +37,22 @@ Each ending definition includes placeholder asset paths for future teammate-prov
 - Social media: `assets/minefluence/endings/social_<tier>.png`
 - Combined ending media: `assets/minefluence/endings/ending_<follower_tier>_<social_tier>.png`
 
-In-game MP4 rendering and custom ending screens are deferred. The MVP uses title, chat, and actionbar output, with a simple external OS video launch for The Famous Villain.
+The Famous Villain ending uses a client-only in-game PNG frame sequence screen.
+MP4 decoding is not used inside Minecraft.
 
-## External Video Hook
+## Ending Video Hook
 
-The Famous Villain ending (`the_famous_villain`, HIGH follower tier + LOW social tier) launches an external MP4 with the OS default player.
+The Famous Villain ending (`the_famous_villain`, HIGH follower tier + LOW social
+tier) sends `minefluence:play_ending_video` to the client. The client opens
+`EndingVideoScreen` and plays:
+
+`assets/minefluence/textures/ending/the_famous_villain/frame_0000.png`
+
+through:
+
+`assets/minefluence/textures/ending/the_famous_villain/frame_0168.png`
+
+Current settings are 169 frames at 10 fps, 640x360, no audio. The smartphone
+`Play Ending Video` button replays the same in-game screen.
 
 See `docs/ending_video_external.md` for setup and testing.

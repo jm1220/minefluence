@@ -5,6 +5,7 @@ import java.util.Locale;
 import net.jeongmin.modid.config.MineFluenceBalance;
 import net.jeongmin.modid.data.MineFluencePlayerData;
 import net.jeongmin.modid.data.MineFluenceWorldState;
+import net.jeongmin.modid.network.MineFluenceNetworking;
 import net.jeongmin.modid.ui.MineFluenceDisplay;
 import net.jeongmin.modid.ui.MineFluenceHud;
 import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
@@ -72,7 +73,7 @@ public final class MineFluenceEndingManager {
 		}
 		showEndingSummary(player, data, ending, true);
 		if (!wasAlreadyTriggered && isTheFamousVillainEnding(ending)) {
-			MineFluenceEndingVideoLauncher.launchTheFamousVillain(player);
+			MineFluenceNetworking.playEndingVideo(player);
 		}
 		MineFluenceHud.refresh(player, data);
 		return ending;
@@ -94,7 +95,7 @@ public final class MineFluenceEndingManager {
 		MineFluenceDisplay.sendChat(player, "Your lies have been exposed.");
 		MineFluenceDisplay.sendChat(player, "Everything collapses.");
 		showEndingSummary(player, data, ending, true);
-		MineFluenceEndingVideoLauncher.launchTheFamousVillain(player);
+		MineFluenceNetworking.playEndingVideo(player);
 		MineFluenceHud.refresh(player, data);
 		return true;
 	}
@@ -136,7 +137,7 @@ public final class MineFluenceEndingManager {
 		}
 
 		String id = ending.id() == null ? "" : ending.id().trim().toLowerCase(Locale.ROOT);
-		if (MineFluenceEndingVideoLauncher.THE_FAMOUS_VILLAIN_ID.equals(id)
+		if (MineFluenceEndingVideos.THE_FAMOUS_VILLAIN_ID.equals(id)
 				|| "villain_influencer".equals(id)
 				|| "ending_high_low".equals(id)) {
 			return true;
@@ -145,7 +146,7 @@ public final class MineFluenceEndingManager {
 	}
 
 	private static MineFluenceEnding famousVillainEnding() {
-		return MineFluenceEndingRegistry.getById(MineFluenceEndingVideoLauncher.THE_FAMOUS_VILLAIN_ID)
+		return MineFluenceEndingRegistry.getById(MineFluenceEndingVideos.THE_FAMOUS_VILLAIN_ID)
 				.orElseGet(() -> MineFluenceEndingRegistry.get(MineFluenceEndingTier.HIGH, MineFluenceEndingTier.LOW));
 	}
 
